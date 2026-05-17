@@ -8,6 +8,7 @@ import {
   select,
   zoom,
   type D3ZoomEvent,
+  type ForceLink,
   type Selection,
   type Simulation,
   type SimulationLinkDatum,
@@ -53,6 +54,16 @@ export class GraphComponent {
   private gEmpty: G;
   private tip: HTMLDivElement;
   private sim: Simulation<GNode, GLink> | null = null;
+  private linkForce: ForceLink<GNode, GLink> | null = null;
+  private nodeById = new Map<string, GNode>();
+  private linkSel: Selection<SVGLineElement, GLink, SVGGElement, unknown> | null =
+    null;
+  private nodeSel: Selection<
+    SVGCircleElement,
+    GNode,
+    SVGGElement,
+    unknown
+  > | null = null;
   private w = 0;
   private h = 0;
   private lastKey = "";
@@ -173,10 +184,40 @@ export class GraphComponent {
       return;
     }
 
-    const nodes: GNode[] = nodeIds.map((id) => ({
-      id,
-      ev: eligible.get(id)!,
-    }));
+    // Reuse node objects across rebuilds so positions persist (no
+    // "explosion" when a new event crosses the cursor mid-play). New nodes
+    // are seeded next to an already-placed neighbour, not at the origin.
+    const nodeSet2 = new Set(nodeIds);
+    for (const id of [...this.nodeById.keys()]) {
+      if (!nodeSet2.has(id)) this.nodeById.delete(id);
+    }
+    const neighbours = new Map<string, string[]>();
+    for (const l of links) {
+      (neighbours.get(l.from) ?? neighbours.set(l.from, []).get(l.from)!).push(
+        l.to,
+      );
+      (neighbours.get(l.to) ?? neighbours.set(l.to, []).get(l.to)!).push(
+        l.from,
+      );
+    }
+    const nodes: GNode[] = nodeIds.map((id) => {
+      const existing = this.nodeById.get(id);
+      if (existing) {
+        existing.ev = eligible.get(id)!;
+        return existing;
+      }
+      const seed = (neighbours.get(id) ?? [])
+        .map((nid) => this.nodeById.get(nid))
+        .find((p) => p && p.x != null);
+      const n: GNode = {
+        id,
+        ev: eligible.get(id)!,
+        x: (seed?.x ?? this.w / 2) + (Math.random() - 0.5) * 30,
+        y: (seed?.y ?? this.h / 2) + (Math.random() - 0.5) * 30,
+      };
+      this.nodeById.set(id, n);
+      return n;
+    });
     const gl: GLink[] = links.map((l) => ({
       source: l.from,
       target: l.to,
@@ -189,6 +230,7 @@ export class GraphComponent {
       .join("line")
       .attr("stroke", (d) => LINK_COLOR[d.type])
       .attr("stroke-width", 1);
+    this.linkSel = link;
 
     const node = this.gNodes
       .selectAll<SVGCircleElement, GNode>("circle")
@@ -211,30 +253,41 @@ export class GraphComponent {
       })
       .on("mouseleave", () => this.tip.classList.remove("visible"))
       .on("click", (_e, d) => this.onSelect(d.ev));
+    this.nodeSel = node;
 
-    this.sim?.stop();
-    this.sim = forceSimulation<GNode, GLink>(nodes)
-      .force(
-        "link",
-        forceLink<GNode, GLink>(gl)
-          .id((d) => d.id)
-          .distance(55)
-          .strength(0.4),
-      )
-      .force("charge", forceManyBody<GNode>().strength(-70))
-      .force("center", forceCenter(this.w / 2, this.h / 2))
-      .force(
-        "collide",
-        forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
-      )
-      .on("tick", () => {
-        link
-          .attr("x1", (d) => (d.source as GNode).x ?? 0)
-          .attr("y1", (d) => (d.source as GNode).y ?? 0)
-          .attr("x2", (d) => (d.target as GNode).x ?? 0)
-          .attr("y2", (d) => (d.target as GNode).y ?? 0);
-        node.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0);
-      });
+    if (!this.sim) {
+      // Created once; the tick reads the latest selections off the instance.
+      this.linkForce = forceLink<GNode, GLink>(gl)
+        .id((d) => d.id)
+        .distance(55)
+        .strength(0.4);
+      this.sim = forceSimulation<GNode, GLink>(nodes)
+        .force("link", this.linkForce)
+        .force("charge", forceManyBody<GNode>().strength(-70))
+        .force("center", forceCenter(this.w / 2, this.h / 2))
+        .force(
+          "collide",
+          forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
+        )
+        .on("tick", () => {
+          this.linkSel
+            ?.attr("x1", (d) => (d.source as GNode).x ?? 0)
+            .attr("y1", (d) => (d.source as GNode).y ?? 0)
+            .attr("x2", (d) => (d.target as GNode).x ?? 0)
+            .attr("y2", (d) => (d.target as GNode).y ?? 0);
+          this.nodeSel
+            ?.attr("cx", (d) => d.x ?? 0)
+            .attr("cy", (d) => d.y ?? 0);
+        });
+    } else {
+      // Reuse the simulation: swap data, recentre, and reheat *gently* —
+      // barely while auto-playing so the layout stays readable.
+      this.sim.nodes(nodes);
+      this.linkForce!.links(gl);
+      this.sim.force("center", forceCenter(this.w / 2, this.h / 2));
+      const target = state.playing ? 0.06 : 0.4;
+      this.sim.alpha(Math.max(this.sim.alpha(), target)).restart();
+    }
 
     node.call(
       drag<SVGCircleElement, GNode>()

@@ -2,6 +2,7 @@ import "./style.css";
 import type { RegulationEvent } from "../shared/schema";
 import { renderCategorySwitcher } from "./controls/categorySwitcher";
 import { enableDockResize } from "./controls/dockResize";
+import { setupDockToggle } from "./controls/dockToggle";
 import { renderLegend } from "./controls/legend";
 import { setupSearch } from "./controls/search";
 import { TimelineControl } from "./controls/timeline";
@@ -64,7 +65,10 @@ async function boot(): Promise<void> {
   const panelEl = document.getElementById("detail-panel")!;
   const timelineEl = document.getElementById("timeline")!;
 
-  setupAbout(document.querySelector<HTMLElement>(".topbar-controls")!);
+  const topbarControls =
+    document.querySelector<HTMLElement>(".topbar-controls")!;
+  setupDockToggle(topbarControls);
+  setupAbout(topbarControls);
   enableDockResize(document.getElementById("rightdock")!);
   setupSearch(document.getElementById("search")!, (q) =>
     store.set({ query: q }),

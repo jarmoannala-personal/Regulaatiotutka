@@ -51,6 +51,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Clip so no view paints under the dock/legend/timeline, even though the
+     radar svg itself needs overflow:visible for its rim labels. */
+  overflow: hidden;
+}
+
+/* Collapsed dock: full-width stage, no right pane. */
+.dock-collapsed .rightdock {
+  display: none;
+}
+.dock-collapsed .stage {
+  right: 0;
 }
 .view-host {
   position: absolute;
