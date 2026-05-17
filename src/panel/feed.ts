@@ -4,16 +4,59 @@ import { colorForEvent } from "../util/colors";
 import { yearOf } from "../util/format";
 import { passesFiltersAndQuery } from "../util/match";
 
-/** Keep the DOM light; the newest slice is what "follows" the timeline. */
+/** Keep the DOM light; the most recent slice is what "follows" the timeline. */
 const MAX_ROWS = 150;
 
-let prevIds = new Set<string>();
+const rows = new Map<string, HTMLElement>();
+let lastSig = "";
+let lastDimension = "";
+
+function makeRow(
+  e: RegulationEvent,
+  dim: AppState["dimension"],
+  onSelect: (e: RegulationEvent) => void,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "feed-item";
+  row.addEventListener("click", (ev) => {
+    if ((ev.target as HTMLElement).closest("a")) return;
+    onSelect(e);
+  });
+
+  const swatch = document.createElement("span");
+  swatch.className = "feed-swatch";
+  swatch.style.background = colorForEvent(e, dim);
+
+  const body = document.createElement("span");
+  body.className = "feed-body";
+  const title = document.createElement("span");
+  title.className = "feed-title";
+  title.textContent = e.title;
+  title.title = e.title;
+  const meta = document.createElement("span");
+  meta.className = "feed-meta";
+  meta.textContent = `${yearOf(e.dateAnnounced)} · ${e.jurisdiction}`;
+  body.append(title, meta);
+
+  const link = document.createElement("a");
+  link.className = "feed-link";
+  link.href = e.sourceUrl;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "↗";
+  link.title = "Avaa virallinen lähde";
+
+  row.append(swatch, body, link);
+  return row;
+}
 
 /**
- * Render the timeline-following feed: every event that has "appeared" by the
- * cursor, newest first, so new rows push in at the top as the timeline plays
- * or is scrubbed. Respects the legend filters. Clicking a row opens the
- * detail panel; the ↗ link goes straight to the official source.
+ * Timeline-following feed. Chronological (oldest at top, newest at the
+ * bottom). Updates are incremental — existing rows are kept, only genuinely
+ * new ones are appended (sliding in) and trimmed-off ones removed — so the
+ * scroll position is preserved and the view eases down by ~one row instead of
+ * lurching. The sweep fires ~60×/s, so a content signature short-circuits
+ * frames where nothing changed.
  */
 export function renderFeed(
   el: HTMLElement,
@@ -22,73 +65,93 @@ export function renderFeed(
   onSelect: (e: RegulationEvent) => void,
 ): void {
   const cursor = state.timelinePosition;
-  const visible = events
+  const matched = events
     .filter(
       (e) =>
         new Date(`${e.dateAnnounced}T12:00:00Z`).getTime() <= cursor &&
         passesFiltersAndQuery(e, state),
     )
-    .sort((a, b) => b.dateAnnounced.localeCompare(a.dateAnnounced));
+    .sort((a, b) => a.dateAnnounced.localeCompare(b.dateAnnounced));
 
-  const shown = visible.slice(0, MAX_ROWS);
-  const nextIds = new Set(shown.map((e) => e.id));
+  const total = matched.length;
+  const shown = matched.slice(Math.max(0, total - MAX_ROWS));
+  const sig = shown.map((e) => e.id).join(",");
+  if (
+    sig === lastSig &&
+    state.dimension === lastDimension &&
+    el.dataset.built === "1"
+  ) {
+    return; // nothing visible changed this frame
+  }
 
-  el.className = "feed-panel";
-  el.innerHTML = "";
+  // One-time scaffold.
+  if (el.dataset.built !== "1") {
+    el.className = "feed-panel";
+    el.innerHTML =
+      '<div class="feed-head"></div><div class="feed-list"></div>';
+    el.dataset.built = "1";
+    rows.clear();
+  }
+  const head = el.querySelector<HTMLElement>(".feed-head")!;
+  const list = el.querySelector<HTMLElement>(".feed-list")!;
+  head.textContent = `Lainsäädäntö · ${total}`;
 
-  const head = document.createElement("div");
-  head.className = "feed-head";
-  head.textContent = `Lainsäädäntö · ${visible.length}`;
-  el.appendChild(head);
+  const wasAtBottom =
+    list.scrollHeight - list.scrollTop - list.clientHeight < 32;
+  const desired = new Set(shown.map((e) => e.id));
+  const firstBuild = rows.size === 0;
 
-  const list = document.createElement("div");
-  list.className = "feed-list";
-  el.appendChild(list);
+  // Remove rows that fell out of the window / filters.
+  for (const [id, node] of rows) {
+    if (!desired.has(id)) {
+      node.remove();
+      rows.delete(id);
+    }
+  }
+
+  // Re-colour swatches if the category dimension changed.
+  const dimChanged = state.dimension !== lastDimension;
+
+  let appended = 0;
+  let lastNode: HTMLElement | null = null;
+  for (const e of shown) {
+    let node = rows.get(e.id);
+    if (!node) {
+      node = makeRow(e, state.dimension, onSelect);
+      if (!firstBuild) {
+        node.classList.add("feed-enter");
+        appended++;
+      }
+      rows.set(e.id, node);
+      // Ascending order: surviving rows keep their order, new ones go after
+      // the last placed node (≈ at the end).
+      if (lastNode) lastNode.after(node);
+      else list.appendChild(node);
+    } else if (dimChanged) {
+      node.querySelector<HTMLElement>(".feed-swatch")!.style.background =
+        colorForEvent(e, state.dimension);
+    }
+    lastNode = node;
+  }
 
   if (shown.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "feed-empty";
-    empty.textContent = "Ei vielä muutoksia — toista aikajanaa.";
-    list.appendChild(empty);
-  }
-
-  for (const e of shown) {
-    const row = document.createElement("div");
-    row.className = "feed-item";
-    if (!prevIds.has(e.id) && prevIds.size > 0) {
-      row.classList.add("just-added");
+    if (!list.querySelector(".feed-empty")) {
+      list.innerHTML =
+        '<div class="feed-empty">Ei vielä muutoksia — toista aikajanaa.</div>';
     }
-    row.addEventListener("click", (ev) => {
-      if ((ev.target as HTMLElement).closest("a")) return;
-      onSelect(e);
-    });
-
-    const swatch = document.createElement("span");
-    swatch.className = "feed-swatch";
-    swatch.style.background = colorForEvent(e, state.dimension);
-
-    const body = document.createElement("span");
-    body.className = "feed-body";
-    const title = document.createElement("span");
-    title.className = "feed-title";
-    title.textContent = e.title;
-    title.title = e.title;
-    const meta = document.createElement("span");
-    meta.className = "feed-meta";
-    meta.textContent = `${yearOf(e.dateAnnounced)} · ${e.jurisdiction}`;
-    body.append(title, meta);
-
-    const link = document.createElement("a");
-    link.className = "feed-link";
-    link.href = e.sourceUrl;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.textContent = "↗";
-    link.title = "Avaa virallinen lähde";
-
-    row.append(swatch, body, link);
-    list.appendChild(row);
+  } else {
+    list.querySelector(".feed-empty")?.remove();
   }
 
-  prevIds = nextIds;
+  // Gentle follow: only nudge when already at the bottom and something was
+  // actually appended (don't yank a user who scrolled up to read).
+  if ((firstBuild || appended > 0) && wasAtBottom) {
+    list.scrollTo({
+      top: list.scrollHeight,
+      behavior: state.playing && !firstBuild ? "smooth" : "auto",
+    });
+  }
+
+  lastSig = sig;
+  lastDimension = state.dimension;
 }

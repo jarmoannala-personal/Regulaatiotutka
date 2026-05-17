@@ -11,8 +11,12 @@
   </head>
   <body>
     <div id="app">
-      <!-- Full-bleed radar canvas -->
-      <div id="stage" class="stage"></div>
+      <!-- Full-bleed visualization canvas -->
+      <div id="stage" class="stage">
+        <div id="radar-host" class="view-host"></div>
+        <div id="trend-host" class="view-host" hidden></div>
+        <div id="graph-host" class="view-host" hidden></div>
+      </div>
 
       <!-- Top bar overlay -->
       <header class="topbar">
@@ -21,6 +25,10 @@
           <span class="brand-sub">Lainsäädännön muutostutka · 2000–2026</span>
         </div>
         <div class="topbar-controls">
+          <div class="switcher-group">
+            <span class="switcher-label">Näkymä</span>
+            <div id="viewswitch"></div>
+          </div>
           <div class="switcher-group">
             <span class="switcher-label">Sektorit</span>
             <div id="switcher"></div>

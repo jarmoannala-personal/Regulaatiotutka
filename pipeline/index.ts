@@ -5,20 +5,21 @@ import type { RegulationEvent } from "../shared/schema.js";
 import { FROM_YEAR, SEED_PATH, TO_YEAR } from "./config.js";
 import { capEvents, dedupeEvents, withinCoverage } from "./dedupe.js";
 import { fetchEurLex } from "./sources/eurlex.js";
+import { fetchEurLexEdges } from "./sources/eurlexEdges.js";
 import { fetchFinlex } from "./sources/finlex.js";
 import { buildDataset, writeDataset } from "./writeDataset.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Run a source, logging and swallowing failure so the build never breaks. */
-async function runSource(
+async function runSource<T>(
   name: string,
-  fn: () => Promise<RegulationEvent[]>,
-): Promise<RegulationEvent[]> {
+  fn: () => Promise<T[]>,
+): Promise<T[]> {
   try {
-    const events = await fn();
-    console.log(`[pipeline] ${name}: ${events.length} events`);
-    return events;
+    const items = await fn();
+    console.log(`[pipeline] ${name}: ${items.length} items`);
+    return items;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[pipeline] ${name}: skipped (${msg})`);
@@ -53,13 +54,26 @@ async function main(): Promise<void> {
     .filter(Boolean)
     .join("+");
 
-  const dataset = buildDataset(merged, origin, sourceVersion);
+  // Experimental: EU legal-relationship edges among the kept events.
+  const celexSet = new Set(
+    merged
+      .filter((e) => e.jurisdiction === "EU" && e.celex)
+      .map((e) => e.celex as string),
+  );
+  let edges: Awaited<ReturnType<typeof fetchEurLexEdges>> = [];
+  if (celexSet.size > 0) {
+    edges = await runSource("eurlex-edges", () =>
+      fetchEurLexEdges(celexSet),
+    );
+  }
+
+  const dataset = buildDataset(merged, origin, sourceVersion, edges);
   const outPath = await writeDataset(dataset, repoRoot);
 
   console.log(
     `[pipeline] wrote ${dataset.counts.total} events ` +
       `(FI ${dataset.counts.fi}, EU ${dataset.counts.eu}) ` +
-      `origin=${origin} -> ${outPath}`,
+      `${edges.length} edges origin=${origin} -> ${outPath}`,
   );
 }
 

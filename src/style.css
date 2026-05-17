@@ -43,10 +43,45 @@ body {
   align-items: center;
   justify-content: center;
 }
+.view-host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.view-host[hidden] {
+  display: none;
+}
 .stage svg {
   display: block;
   /* Let sector-rim labels render past the square without clipping. */
   overflow: visible;
+}
+
+/* ---- Trend chart ---- */
+.trend-axis path,
+.trend-axis line {
+  stroke: var(--line);
+}
+.trend-axis text {
+  fill: var(--faint);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.trend-line {
+  opacity: 0.92;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.4));
+}
+.trend-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+.trend-cursor {
+  stroke: var(--accent-warm);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+  opacity: 0.65;
 }
 
 /* ---- Top bar ---- */
@@ -226,13 +261,22 @@ body {
 .feed-item:hover {
   background: rgba(255, 255, 255, 0.045);
 }
-@keyframes feed-pop {
-  from {
-    background: rgba(56, 232, 255, 0.22);
+@keyframes feed-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+    background: rgba(56, 232, 255, 0.28);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    background: transparent;
   }
 }
-.feed-item.just-added {
-  animation: feed-pop 1.4s ease;
+.feed-item.feed-enter {
+  animation: feed-enter 1.1s ease;
 }
 .feed-swatch {
   flex: 0 0 auto;

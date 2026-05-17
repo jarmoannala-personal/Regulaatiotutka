@@ -2,6 +2,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type {
   RegulationDataset,
+  RegulationEdge,
   RegulationEvent,
 } from "../shared/schema.js";
 import { SCHEMA_VERSION } from "../shared/schema.js";
@@ -11,6 +12,7 @@ export function buildDataset(
   events: RegulationEvent[],
   origin: RegulationDataset["origin"],
   sourceVersion: string,
+  edges: RegulationEdge[],
 ): RegulationDataset {
   const sorted = [...events].sort((a, b) =>
     a.dateAnnounced.localeCompare(b.dateAnnounced),
@@ -27,6 +29,7 @@ export function buildDataset(
       eu: sorted.filter((e) => e.jurisdiction === "EU").length,
     },
     events: sorted,
+    edges,
   };
 }
 

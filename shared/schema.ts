@@ -55,6 +55,15 @@ export interface RegulationEvent {
   domainConfidence: DomainConfidence;
 }
 
+export type EdgeType = "amends" | "repeals" | "based_on";
+
+/** A directed legal relationship between two events (EU only, by id). */
+export interface RegulationEdge {
+  from: string;
+  to: string;
+  type: EdgeType;
+}
+
 export const SCHEMA_VERSION = "v1" as const;
 
 export interface RegulationDataset {
@@ -68,6 +77,8 @@ export interface RegulationDataset {
   coverage: { fromYear: number; toYear: number };
   counts: { total: number; fi: number; eu: number };
   events: RegulationEvent[];
+  /** EU legal relationships among the events (may be empty). */
+  edges: RegulationEdge[];
 }
 
 export const DOMAINS: readonly Domain[] = [

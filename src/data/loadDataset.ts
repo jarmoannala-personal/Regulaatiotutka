@@ -49,5 +49,6 @@ export async function loadDataset(): Promise<RegulationDataset> {
   if (!Array.isArray(d.events) || !d.events.every(isEvent)) {
     throw new Error("Dataset events are missing or malformed");
   }
+  if (!Array.isArray(d.edges)) d.edges = []; // edges are optional/experimental
   return data as RegulationDataset;
 }

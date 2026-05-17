@@ -37,6 +37,13 @@ export function loadPersisted(defaults: AppState): AppState {
 
   const next: AppState = { ...defaults };
 
+  if (
+    parsed.view === "radar" ||
+    parsed.view === "trend" ||
+    parsed.view === "graph"
+  ) {
+    next.view = parsed.view;
+  }
   if (DIMENSIONS.includes(parsed.dimension as CategoryDimension)) {
     next.dimension = parsed.dimension as CategoryDimension;
   }

@@ -9,8 +9,11 @@ import { loadDataset } from "./data/loadDataset";
 import { setupAbout } from "./panel/about";
 import { renderDetailPanel } from "./panel/detailPanel";
 import { renderFeed } from "./panel/feed";
+import { renderViewSwitcher } from "./controls/viewSwitcher";
+import { GraphComponent } from "./graph/graph";
 import { RadarComponent } from "./radar/radar";
 import { SweepDriver } from "./radar/sweep";
+import { TrendComponent } from "./trend/trend";
 import { createStore, defaultState } from "./state/appState";
 import { loadPersisted, savePersisted } from "./state/persistence";
 
@@ -34,6 +37,7 @@ async function boot(): Promise<void> {
     return;
   }
   const events = dataset.events;
+  const edges = dataset.edges;
 
   const banner = document.getElementById("data-banner");
   if (banner && dataset.origin === "seed-fallback") {
@@ -50,8 +54,11 @@ async function boot(): Promise<void> {
   const defaults = defaultState(dataset.coverage);
   const store = createStore(loadPersisted(defaults));
 
-  const stageEl = document.getElementById("stage")!;
+  const radarHost = document.getElementById("radar-host")!;
+  const trendHost = document.getElementById("trend-host")!;
+  const graphHost = document.getElementById("graph-host")!;
   const switcherEl = document.getElementById("switcher")!;
+  const viewSwitchEl = document.getElementById("viewswitch")!;
   const legendEl = document.getElementById("legend")!;
   const feedEl = document.getElementById("feed")!;
   const panelEl = document.getElementById("detail-panel")!;
@@ -64,9 +71,13 @@ async function boot(): Promise<void> {
   );
 
   const radar = new RadarComponent(
-    stageEl,
+    radarHost,
     timeDomain,
     (e: RegulationEvent) => store.set({ selectedEventId: e.id }),
+  );
+  const trend = new TrendComponent(trendHost, timeDomain);
+  const graph = new GraphComponent(graphHost, (e: RegulationEvent) =>
+    store.set({ selectedEventId: e.id }),
   );
 
   const timeline = new TimelineControl(timelineEl, timeDomain, {
@@ -117,8 +128,20 @@ async function boot(): Promise<void> {
   });
 
   let lastDimension = "";
+  let lastView = "";
   store.subscribe((s) => {
-    radar.update(s, events);
+    if (s.view !== lastView) {
+      lastView = s.view;
+      radarHost.hidden = s.view !== "radar";
+      trendHost.hidden = s.view !== "trend";
+      graphHost.hidden = s.view !== "graph";
+      renderViewSwitcher(viewSwitchEl, s.view, (view) =>
+        store.set({ view }),
+      );
+    }
+    if (s.view === "radar") radar.update(s, events);
+    else if (s.view === "trend") trend.update(s, events);
+    else graph.update(s, events, edges);
     timeline.update(s);
     if (s.dimension !== lastDimension) {
       lastDimension = s.dimension;

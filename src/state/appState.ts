@@ -10,7 +10,12 @@ export type CategoryDimension = "domain" | "jurisdiction" | "impact";
 
 export type PlaySpeed = 0.1 | 0.5 | 1 | 2 | 4;
 
+/** Main visualization: the sweep radar or the area-trend chart. */
+export type ViewMode = "radar" | "trend" | "graph";
+
 export interface AppState {
+  /** Radar vs trend chart. Persisted. */
+  view: ViewMode;
   /** Angular-sector dimension. Persisted. */
   dimension: CategoryDimension;
   /** "manual" = scrub; "auto" = sweeping hand. Persisted. */
@@ -35,6 +40,7 @@ export interface AppState {
 
 /** Keys persisted to localStorage (the rest are transient). */
 export const PERSISTED_KEYS = [
+  "view",
   "dimension",
   "mode",
   "speed",
@@ -47,6 +53,7 @@ export function defaultState(coverage: {
   toYear: number;
 }): AppState {
   return {
+    view: "radar",
     dimension: "domain",
     mode: "manual",
     playing: false,
