@@ -8,6 +8,7 @@ import {
   select,
   zoom,
   type D3ZoomEvent,
+  type ForceLink,
   type Selection,
   type Simulation,
   type SimulationLinkDatum,
@@ -59,6 +60,20 @@ export class GraphComponent {
     SVGGElement,
     unknown
   > | null = null;
+  private linkSel: Selection<
+    SVGLineElement,
+    GLink,
+    SVGGElement,
+    unknown
+  > | null = null;
+  private nodeSel: Selection<
+    SVGCircleElement,
+    GNode,
+    SVGGElement,
+    unknown
+  > | null = null;
+  private linkForce: ForceLink<GNode, GLink> | null = null;
+  private nodeById = new Map<string, GNode>();
   private zoomK = 1;
   private labelBaseIds = new Set<string>();
   private labelRanked: GNode[] = [];
@@ -192,10 +207,38 @@ export class GraphComponent {
       return;
     }
 
-    const nodes: GNode[] = nodeIds.map((id) => ({
-      id,
-      ev: eligible.get(id)!,
-    }));
+    // While auto-playing, keep node identity + positions so the graph
+    // *grows in place* (no bounce); only brand-new nodes are added, seeded
+    // next to a placed neighbour. Paused/explore mode uses fresh objects so
+    // it gets the clean full spread.
+    const reuse = state.playing && this.sim != null;
+    const nbMap = new Map<string, string[]>();
+    if (reuse) {
+      for (const l of links) {
+        (nbMap.get(l.from) ?? nbMap.set(l.from, []).get(l.from)!).push(l.to);
+        (nbMap.get(l.to) ?? nbMap.set(l.to, []).get(l.to)!).push(l.from);
+      }
+    }
+    const nodes: GNode[] = nodeIds.map((id) => {
+      if (reuse) {
+        const ex = this.nodeById.get(id);
+        if (ex) {
+          ex.ev = eligible.get(id)!;
+          return ex;
+        }
+        const seed = (nbMap.get(id) ?? [])
+          .map((x) => this.nodeById.get(x))
+          .find((p) => p && p.x != null);
+        return {
+          id,
+          ev: eligible.get(id)!,
+          x: (seed?.x ?? this.w / 2) + (Math.random() - 0.5) * 24,
+          y: (seed?.y ?? this.h / 2) + (Math.random() - 0.5) * 24,
+        };
+      }
+      return { id, ev: eligible.get(id)! };
+    });
+    this.nodeById = new Map(nodes.map((n) => [n.id, n]));
     const gl: GLink[] = links.map((l) => ({
       source: l.from,
       target: l.to,
@@ -208,6 +251,7 @@ export class GraphComponent {
       .join("line")
       .attr("stroke", (d) => LINK_COLOR[d.type])
       .attr("stroke-width", 1);
+    this.linkSel = link;
 
     const node = this.gNodes
       .selectAll<SVGCircleElement, GNode>("circle")
@@ -230,6 +274,7 @@ export class GraphComponent {
       })
       .on("mouseleave", () => this.tip.classList.remove("visible"))
       .on("click", (_e, d) => this.onSelect(d.ev));
+    this.nodeSel = node;
 
     // Label only a few "signal" nodes: hubs, the oldest, and one
     // representative per isolated island (not the giant component).
@@ -295,32 +340,41 @@ export class GraphComponent {
     );
     this.renderLabels();
 
-    this.sim?.stop();
-    this.sim = forceSimulation<GNode, GLink>(nodes)
-      .force(
-        "link",
-        forceLink<GNode, GLink>(gl)
-          .id((d) => d.id)
-          .distance(55)
-          .strength(0.4),
-      )
-      .force("charge", forceManyBody<GNode>().strength(-70))
-      .force("center", forceCenter(this.w / 2, this.h / 2))
-      .force(
-        "collide",
-        forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
-      )
-      .on("tick", () => {
-        link
-          .attr("x1", (d) => (d.source as GNode).x ?? 0)
-          .attr("y1", (d) => (d.source as GNode).y ?? 0)
-          .attr("x2", (d) => (d.target as GNode).x ?? 0)
-          .attr("y2", (d) => (d.target as GNode).y ?? 0);
-        node.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0);
-        this.labelSel
-          ?.attr("x", (d) => (d.x ?? 0) + R[d.ev.impactTier] + 4)
-          .attr("y", (d) => (d.y ?? 0) + 3);
-      });
+    if (reuse && this.sim && this.linkForce) {
+      // Grow in place: feed the new node/link set into the *existing*
+      // simulation and give it a gentle nudge so newcomers settle without
+      // throwing the whole layout around.
+      this.sim.nodes(nodes);
+      this.linkForce.links(gl);
+      this.sim.alpha(0.12).restart();
+    } else {
+      this.sim?.stop();
+      this.linkForce = forceLink<GNode, GLink>(gl)
+        .id((d) => d.id)
+        .distance(55)
+        .strength(0.4);
+      this.sim = forceSimulation<GNode, GLink>(nodes)
+        .force("link", this.linkForce)
+        .force("charge", forceManyBody<GNode>().strength(-70))
+        .force("center", forceCenter(this.w / 2, this.h / 2))
+        .force(
+          "collide",
+          forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
+        )
+        .on("tick", () => {
+          this.linkSel
+            ?.attr("x1", (d) => (d.source as GNode).x ?? 0)
+            .attr("y1", (d) => (d.source as GNode).y ?? 0)
+            .attr("x2", (d) => (d.target as GNode).x ?? 0)
+            .attr("y2", (d) => (d.target as GNode).y ?? 0);
+          this.nodeSel
+            ?.attr("cx", (d) => d.x ?? 0)
+            .attr("cy", (d) => d.y ?? 0);
+          this.labelSel
+            ?.attr("x", (d) => (d.x ?? 0) + R[d.ev.impactTier] + 4)
+            .attr("y", (d) => (d.y ?? 0) + 3);
+        });
+    }
 
     node.call(
       drag<SVGCircleElement, GNode>()
