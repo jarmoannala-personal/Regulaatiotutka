@@ -5,12 +5,25 @@ over time**, focused on what matters to companies (oy, oyj, tmi, säätiö,
 yhdistys): corporate governance, tax, accounting, employment, data protection,
 financial/securities, competition and environment.
 
-The centrepiece is a **sweep radar**: radial distance encodes time
-(outer = newer), angular sectors encode a switchable category
-(legal domain / Finland vs EU / impact). A timeline scrubber is the primary
-control — drag it across 2000→today, or hit Play to auto-sweep while sectors
-"flash" as changes enter the window. Hover a blip for a summary, click for the
-official source.
+A timeline scrubber (2000→2026, with 0.1×–4× auto-play) is the primary
+control across three switchable **views**, all sharing the same dimension
+switch (legal domain / Finland vs EU / impact), legend filters and search:
+
+- **Tutka (radar)** — sweep radar: radial distance encodes time (outer =
+  newer), angular sectors the chosen dimension. Blips pop in and sectors
+  "flash" as changes enter the window during play/scrub.
+- **Trendi (trend)** — per-category yearly volume lines that grow with the
+  cursor; shows when each area surged (e.g. data protection 2016–2018).
+- **Graafi (graph)** — *experimental* d3 force network of real EUR-Lex
+  legal relationships (amends / repeals / based-on, ~1000 edges) with
+  wheel/trackpad-pinch zoom and drag-pan; self-degrades to an empty note
+  when filtered too sparse.
+
+Hover any item for a summary, click for the official source. A right-hand
+dock holds a free-text search, the legend (click to filter), and a
+timeline-following feed of the legislation as it appears. The search has a
+hand-curated EN/acronym↔Finnish + CELEX alias map, so "gdpr", "ai act" or
+"tax" hit the Finnish corpus.
 
 ## Architecture
 
@@ -26,9 +39,14 @@ official source.
 
 | Source | Use | Licence |
 | --- | --- | --- |
-| [EUR-Lex / CELLAR SPARQL](https://publications.europa.eu/webapi/rdf/sparql) | EU regulations & directives, EuroVoc-tagged | metadata CC0, content CC BY 4.0 |
+| [EUR-Lex / CELLAR SPARQL](https://publications.europa.eu/webapi/rdf/sparql) | EU regulations & directives (EuroVoc-tagged) + amends/repeals/based-on edges | metadata CC0, content CC BY 4.0 |
 | [Finlex open data](https://opendata.finlex.fi) | Finnish consolidated statutes (Akoma Ntoso XML) | open data, attribute Finlex |
 | Committed seed (`pipeline/seed/seed-events.json`) | ~50 curated landmark FI/EU acts; offline fallback | hand-curated |
+
+The pipeline emits `events` plus an experimental `edges` array (EU legal
+relationships among the kept events) into `regulations.v1.json`; the
+`eurlex-edges` step is year-by-year, time-budgeted and failure-tolerant
+(empty edges just make the graph view self-degrade).
 
 The pipeline merges the seed in every run for baseline coverage and **always
 exits 0**: if both live sources are unreachable it writes the seed with
