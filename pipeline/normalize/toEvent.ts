@@ -5,8 +5,24 @@ import { domainFromEurovoc, domainFromTitle } from "./domainMap.js";
 /** Base EU legal-act CELEX, e.g. 32016R0679 / 32019L1937 (no corrigenda). */
 const BASE_CELEX = /^3\d{4}[LR]\d{4}$/;
 
+/** Decode stray XML char-refs Finlex leaves in titles (e.g. `&#13;`). */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) =>
+      String.fromCodePoint(parseInt(h, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
 function shorten(text: string, max = 280): string {
-  const t = text.replace(/\s+/g, " ").trim();
+  // Decode entities first, then fold all whitespace/controls into spaces.
+  const t = decodeEntities(text).replace(/\s+/g, " ").trim();
   if (t.length <= max) return t;
   return t.slice(0, max - 1).replace(/\s\S*$/, "") + "…";
 }

@@ -9,6 +9,9 @@ const MAX_ROWS = 150;
 
 const rows = new Map<string, HTMLElement>();
 let lastSig = "";
+// Whether the view is glued to the bottom. Driven by the user's own
+// scrolling, so it survives the ~60×/s re-render frames reliably.
+let pinned = true;
 let lastDimension = "";
 
 function makeRow(
@@ -91,13 +94,17 @@ export function renderFeed(
       '<div class="feed-head"></div><div class="feed-list"></div>';
     el.dataset.built = "1";
     rows.clear();
+    const l = el.querySelector<HTMLElement>(".feed-list")!;
+    // The user's scroll position decides whether we keep following. Re-pin
+    // once they scroll back to (near) the bottom; unpin when they read up.
+    l.addEventListener("scroll", () => {
+      pinned = l.scrollHeight - l.scrollTop - l.clientHeight < 48;
+    });
   }
   const head = el.querySelector<HTMLElement>(".feed-head")!;
   const list = el.querySelector<HTMLElement>(".feed-list")!;
   head.textContent = `Lainsäädäntö · ${total}`;
 
-  const wasAtBottom =
-    list.scrollHeight - list.scrollTop - list.clientHeight < 32;
   const desired = new Set(shown.map((e) => e.id));
   const firstBuild = rows.size === 0;
 
@@ -143,13 +150,12 @@ export function renderFeed(
     list.querySelector(".feed-empty")?.remove();
   }
 
-  // Gentle follow: only nudge when already at the bottom and something was
-  // actually appended (don't yank a user who scrolled up to read).
-  if ((firstBuild || appended > 0) && wasAtBottom) {
-    list.scrollTo({
-      top: list.scrollHeight,
-      behavior: state.playing && !firstBuild ? "smooth" : "auto",
-    });
+  // Follow the newest: stay glued to the bottom while pinned (the user
+  // hasn't scrolled up to read). Instant — animating the scroll is what
+  // previously broke the follow once the list overflowed; the per-row
+  // slide-in supplies the motion cue instead.
+  if ((firstBuild || appended > 0) && pinned) {
+    list.scrollTop = list.scrollHeight;
   }
 
   lastSig = sig;
