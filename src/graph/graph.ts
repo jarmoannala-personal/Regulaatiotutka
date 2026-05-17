@@ -8,7 +8,6 @@ import {
   select,
   zoom,
   type D3ZoomEvent,
-  type ForceLink,
   type Selection,
   type Simulation,
   type SimulationLinkDatum,
@@ -51,19 +50,20 @@ export class GraphComponent {
   private gRoot: G;
   private gLinks: G;
   private gNodes: G;
+  private gLabels: G;
   private gEmpty: G;
   private tip: HTMLDivElement;
-  private sim: Simulation<GNode, GLink> | null = null;
-  private linkForce: ForceLink<GNode, GLink> | null = null;
-  private nodeById = new Map<string, GNode>();
-  private linkSel: Selection<SVGLineElement, GLink, SVGGElement, unknown> | null =
-    null;
-  private nodeSel: Selection<
-    SVGCircleElement,
+  private labelSel: Selection<
+    SVGTextElement,
     GNode,
     SVGGElement,
     unknown
   > | null = null;
+  private zoomK = 1;
+  private labelBaseIds = new Set<string>();
+  private labelRanked: GNode[] = [];
+  private labelRaf = 0;
+  private sim: Simulation<GNode, GLink> | null = null;
   private w = 0;
   private h = 0;
   private lastKey = "";
@@ -81,6 +81,7 @@ export class GraphComponent {
     this.gRoot = this.svg.append("g");
     this.gLinks = this.gRoot.append("g").attr("stroke-opacity", 0.35);
     this.gNodes = this.gRoot.append("g");
+    this.gLabels = this.gRoot.append("g");
     this.gEmpty = this.svg.append("g");
     this.tip = document.createElement("div");
     this.tip.className = "radar-tooltip";
@@ -98,9 +99,16 @@ export class GraphComponent {
           !(t instanceof Element && t.closest("circle"))
         );
       })
-      .on("zoom", (ev: D3ZoomEvent<SVGSVGElement, unknown>) =>
-        this.gRoot.attr("transform", ev.transform.toString()),
-      );
+      .on("zoom", (ev: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        this.gRoot.attr("transform", ev.transform.toString());
+        this.zoomK = ev.transform.k;
+        if (!this.labelRaf) {
+          this.labelRaf = requestAnimationFrame(() => {
+            this.labelRaf = 0;
+            this.renderLabels();
+          });
+        }
+      });
     this.svg.call(z).on("dblclick.zoom", null);
     this.svg.style("cursor", "grab");
 
@@ -184,40 +192,10 @@ export class GraphComponent {
       return;
     }
 
-    // Reuse node objects across rebuilds so positions persist (no
-    // "explosion" when a new event crosses the cursor mid-play). New nodes
-    // are seeded next to an already-placed neighbour, not at the origin.
-    const nodeSet2 = new Set(nodeIds);
-    for (const id of [...this.nodeById.keys()]) {
-      if (!nodeSet2.has(id)) this.nodeById.delete(id);
-    }
-    const neighbours = new Map<string, string[]>();
-    for (const l of links) {
-      (neighbours.get(l.from) ?? neighbours.set(l.from, []).get(l.from)!).push(
-        l.to,
-      );
-      (neighbours.get(l.to) ?? neighbours.set(l.to, []).get(l.to)!).push(
-        l.from,
-      );
-    }
-    const nodes: GNode[] = nodeIds.map((id) => {
-      const existing = this.nodeById.get(id);
-      if (existing) {
-        existing.ev = eligible.get(id)!;
-        return existing;
-      }
-      const seed = (neighbours.get(id) ?? [])
-        .map((nid) => this.nodeById.get(nid))
-        .find((p) => p && p.x != null);
-      const n: GNode = {
-        id,
-        ev: eligible.get(id)!,
-        x: (seed?.x ?? this.w / 2) + (Math.random() - 0.5) * 30,
-        y: (seed?.y ?? this.h / 2) + (Math.random() - 0.5) * 30,
-      };
-      this.nodeById.set(id, n);
-      return n;
-    });
+    const nodes: GNode[] = nodeIds.map((id) => ({
+      id,
+      ev: eligible.get(id)!,
+    }));
     const gl: GLink[] = links.map((l) => ({
       source: l.from,
       target: l.to,
@@ -230,7 +208,6 @@ export class GraphComponent {
       .join("line")
       .attr("stroke", (d) => LINK_COLOR[d.type])
       .attr("stroke-width", 1);
-    this.linkSel = link;
 
     const node = this.gNodes
       .selectAll<SVGCircleElement, GNode>("circle")
@@ -253,41 +230,97 @@ export class GraphComponent {
       })
       .on("mouseleave", () => this.tip.classList.remove("visible"))
       .on("click", (_e, d) => this.onSelect(d.ev));
-    this.nodeSel = node;
 
-    if (!this.sim) {
-      // Created once; the tick reads the latest selections off the instance.
-      this.linkForce = forceLink<GNode, GLink>(gl)
-        .id((d) => d.id)
-        .distance(55)
-        .strength(0.4);
-      this.sim = forceSimulation<GNode, GLink>(nodes)
-        .force("link", this.linkForce)
-        .force("charge", forceManyBody<GNode>().strength(-70))
-        .force("center", forceCenter(this.w / 2, this.h / 2))
-        .force(
-          "collide",
-          forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
-        )
-        .on("tick", () => {
-          this.linkSel
-            ?.attr("x1", (d) => (d.source as GNode).x ?? 0)
-            .attr("y1", (d) => (d.source as GNode).y ?? 0)
-            .attr("x2", (d) => (d.target as GNode).x ?? 0)
-            .attr("y2", (d) => (d.target as GNode).y ?? 0);
-          this.nodeSel
-            ?.attr("cx", (d) => d.x ?? 0)
-            .attr("cy", (d) => d.y ?? 0);
-        });
-    } else {
-      // Reuse the simulation: swap data, recentre, and reheat *gently* —
-      // barely while auto-playing so the layout stays readable.
-      this.sim.nodes(nodes);
-      this.linkForce!.links(gl);
-      this.sim.force("center", forceCenter(this.w / 2, this.h / 2));
-      const target = state.playing ? 0.06 : 0.4;
-      this.sim.alpha(Math.max(this.sim.alpha(), target)).restart();
+    // Label only a few "signal" nodes: hubs, the oldest, and one
+    // representative per isolated island (not the giant component).
+    const deg = new Map<string, number>();
+    const adj = new Map<string, string[]>();
+    for (const l of links) {
+      deg.set(l.from, (deg.get(l.from) ?? 0) + 1);
+      deg.set(l.to, (deg.get(l.to) ?? 0) + 1);
+      (adj.get(l.from) ?? adj.set(l.from, []).get(l.from)!).push(l.to);
+      (adj.get(l.to) ?? adj.set(l.to, []).get(l.to)!).push(l.from);
     }
+    const comp = new Map<string, number>();
+    let ci = 0;
+    for (const n of nodes) {
+      if (comp.has(n.id)) continue;
+      const stack = [n.id];
+      comp.set(n.id, ci);
+      while (stack.length) {
+        const cur = stack.pop()!;
+        for (const nb of adj.get(cur) ?? []) {
+          if (!comp.has(nb)) {
+            comp.set(nb, ci);
+            stack.push(nb);
+          }
+        }
+      }
+      ci++;
+    }
+    const compSize = new Map<number, number>();
+    for (const c of comp.values())
+      compSize.set(c, (compSize.get(c) ?? 0) + 1);
+    const giant = [...compSize.entries()].sort(
+      (a, b) => b[1] - a[1],
+    )[0]?.[0];
+    const labelIds = new Set<string>();
+    [...nodes]
+      .sort((a, b) => (deg.get(b.id) ?? 0) - (deg.get(a.id) ?? 0))
+      .slice(0, 14)
+      .forEach((n) => labelIds.add(n.id));
+    [...nodes]
+      .sort((a, b) => a.ev.dateAnnounced.localeCompare(b.ev.dateAnnounced))
+      .slice(0, 3)
+      .forEach((n) => labelIds.add(n.id));
+    const repByComp = new Map<number, GNode>();
+    for (const n of nodes) {
+      const c = comp.get(n.id)!;
+      if (c === giant) continue;
+      const cur = repByComp.get(c);
+      if (!cur || (deg.get(n.id) ?? 0) > (deg.get(cur.id) ?? 0)) {
+        repByComp.set(c, n);
+      }
+    }
+    [...repByComp.entries()]
+      .sort((a, b) => (compSize.get(b[0]) ?? 0) - (compSize.get(a[0]) ?? 0))
+      .slice(0, 6)
+      .forEach(([, n]) => labelIds.add(n.id));
+
+    // Always-on base set; more central-node labels appear as you zoom in
+    // (see renderLabels / the zoom handler).
+    this.labelBaseIds = labelIds;
+    this.labelRanked = [...nodes].sort(
+      (a, b) => (deg.get(b.id) ?? 0) - (deg.get(a.id) ?? 0),
+    );
+    this.renderLabels();
+
+    this.sim?.stop();
+    this.sim = forceSimulation<GNode, GLink>(nodes)
+      .force(
+        "link",
+        forceLink<GNode, GLink>(gl)
+          .id((d) => d.id)
+          .distance(55)
+          .strength(0.4),
+      )
+      .force("charge", forceManyBody<GNode>().strength(-70))
+      .force("center", forceCenter(this.w / 2, this.h / 2))
+      .force(
+        "collide",
+        forceCollide<GNode>((d) => R[d.ev.impactTier] + 3),
+      )
+      .on("tick", () => {
+        link
+          .attr("x1", (d) => (d.source as GNode).x ?? 0)
+          .attr("y1", (d) => (d.source as GNode).y ?? 0)
+          .attr("x2", (d) => (d.target as GNode).x ?? 0)
+          .attr("y2", (d) => (d.target as GNode).y ?? 0);
+        node.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0);
+        this.labelSel
+          ?.attr("x", (d) => (d.x ?? 0) + R[d.ev.impactTier] + 4)
+          .attr("y", (d) => (d.y ?? 0) + 3);
+      });
 
     node.call(
       drag<SVGCircleElement, GNode>()
@@ -306,5 +339,36 @@ export class GraphComponent {
           d.fy = null;
         }),
     );
+  }
+
+  /**
+   * Render the node labels: the always-on base set (hubs / oldest / island
+   * reps) plus more central nodes the further you've zoomed in. Text is
+   * counter-scaled by the zoom so it stays readable instead of ballooning.
+   */
+  private renderLabels(): void {
+    const extra = Math.max(
+      0,
+      Math.min(500, Math.round((this.zoomK - 1) * 90)),
+    );
+    const ids = new Set(this.labelBaseIds);
+    for (let i = 0; i < this.labelRanked.length && i < 14 + extra; i++) {
+      ids.add(this.labelRanked[i].id);
+    }
+    const data = this.labelRanked.filter((n) => ids.has(n.id));
+    const fs = (10 / Math.max(1, this.zoomK)).toFixed(2);
+
+    this.labelSel = this.gLabels
+      .selectAll<SVGTextElement, GNode>("text")
+      .data(data, (d) => d.id)
+      .join("text")
+      .attr("class", "graph-label")
+      .style("font-size", `${fs}px`)
+      .attr("x", (d) => (d.x ?? 0) + R[d.ev.impactTier] + 4)
+      .attr("y", (d) => (d.y ?? 0) + 3)
+      .text((d) => {
+        const t = d.ev.title.replace(/\s+/g, " ").trim();
+        return t.length > 34 ? `${t.slice(0, 33)}…` : t;
+      });
   }
 }
