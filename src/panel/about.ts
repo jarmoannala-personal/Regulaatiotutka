@@ -8,8 +8,12 @@ function buildOverlay(): HTMLDivElement {
       <button class="about-close" aria-label="Sulje">×</button>
       <h2>Regulaatiotutka</h2>
       <p class="about-tagline">
-        Suomen ja EU:n yritysrelevantin lainsäädännön muutostutka — 2000–2026.
-        Säädökset ja oikeustapaukset aikajanalla tutkanäkymässä.
+        Suomen ja EU:n yritysrelevantin lainsäädännön muutokset aikajanalla
+        2000–2026. Kolme näkymää: <strong>Tutka</strong> (säädökset
+        aikakehällä), <strong>Trendi</strong> (vuosittainen kehitys
+        oikeudenaloittain) ja <strong>Graafi</strong> (säädösten väliset
+        suhteet — kokeellinen). Vaihda sektorointi, suodata selitteestä, hae
+        tekstillä.
       </p>
       <dl class="about-meta">
         <dt>Versio</dt>
@@ -21,8 +25,9 @@ function buildOverlay(): HTMLDivElement {
       </dl>
       <h3>Tietolähteet</h3>
       <ul class="about-sources">
-        <li><strong>EUR-Lex / CELLAR</strong> — EU-asetukset ja -direktiivit,
-          EuroVoc-luokittelu. Metatiedot CC0, sisältö CC BY 4.0.</li>
+        <li><strong>EUR-Lex / CELLAR</strong> — EU-asetukset ja -direktiivit
+          (EuroVoc-luokittelu) sekä säädösten suhteet (muuttaa / kumoaa /
+          perustuu). Metatiedot CC0, sisältö CC BY 4.0.</li>
         <li><strong>Finlex avoin data</strong> — Suomen konsolidoidut säädökset
           (Akoma Ntoso). Avoin data, lähdeviittaus Finlex.</li>
         <li><strong>Siemendata</strong> — käsin koostetut keskeiset säädökset,
