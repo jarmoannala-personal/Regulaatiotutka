@@ -1,0 +1,107 @@
+import type { RegulationEvent } from "../../shared/schema.js";
+import { computeImpactTier } from "./impact.js";
+import { domainFromEurovoc, domainFromTitle } from "./domainMap.js";
+
+/** Base EU legal-act CELEX, e.g. 32016R0679 / 32019L1937 (no corrigenda). */
+const BASE_CELEX = /^3\d{4}[LR]\d{4}$/;
+
+function shorten(text: string, max = 280): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1).replace(/\s\S*$/, "") + "…";
+}
+
+export interface EurLexRow {
+  celex: string;
+  resourceType: string; // authority URI ending /REG or /DIR
+  docDate: string; // yyyy-mm-dd
+  inForce?: string; // yyyy-mm-dd
+  titleFi?: string;
+  titleEn?: string;
+  eurovocIds: string[]; // numeric ids
+}
+
+/** EU work -> RegulationEvent, or null if it should be skipped. */
+export function normalizeEurLex(row: EurLexRow): RegulationEvent | null {
+  if (!BASE_CELEX.test(row.celex)) return null;
+  const title = (row.titleFi || row.titleEn || "").trim();
+  if (!title) return null;
+
+  const domain =
+    domainFromEurovoc(row.eurovocIds) ?? domainFromTitle(title);
+  if (!domain) return null;
+
+  const instrumentType = row.resourceType.endsWith("/DIR")
+    ? "directive"
+    : "regulation";
+
+  return {
+    id: `eu:${row.celex}`,
+    title: shorten(title, 200),
+    jurisdiction: "EU",
+    domain,
+    impactTier: computeImpactTier(instrumentType, undefined, title, "eu"),
+    dateAnnounced: row.docDate,
+    dateInForce: row.inForce ?? null,
+    sourceUrl: `https://eur-lex.europa.eu/legal-content/FI/TXT/?uri=CELEX:${row.celex}`,
+    summary: shorten(title),
+    instrumentType,
+    celex: row.celex,
+    domainConfidence: domainFromEurovoc(row.eurovocIds) ? "tagged" : "keyword",
+  };
+}
+
+export interface FinlexItem {
+  statuteNumber: string; // "624/2006"
+  title: string;
+  dateIssued: string; // yyyy-mm-dd
+  dateInForce?: string;
+  isAmendment: boolean;
+  amendedSections?: string[];
+  eli?: string;
+  /** Finlex typeStatute refersTo, stripped of '#': "act" | "decree" | … */
+  statuteType?: string;
+}
+
+/** FI consolidated statute -> RegulationEvent, or null if out of scope. */
+export function normalizeFinlex(item: FinlexItem): RegulationEvent | null {
+  const title = item.title.trim();
+  if (!title) return null;
+  const domain = domainFromTitle(title);
+  if (!domain) return null; // out of company-relevant scope
+
+  const instrumentType = item.isAmendment ? "amendment" : "act";
+  const impactKind =
+    item.statuteType === "act"
+      ? "fi-act"
+      : item.statuteType === "decree"
+        ? "fi-decree"
+        : "fi-other";
+  const [num, year] = item.statuteNumber.split("/");
+  const pad = `${year}${num.padStart(4, "0")}`;
+  const kind = item.isAmendment ? "alkup" : "ajantasa";
+
+  return {
+    id: `fi:${item.statuteNumber}`,
+    title: shorten(title, 200),
+    jurisdiction: "FI",
+    domain,
+    impactTier: computeImpactTier(
+      instrumentType,
+      item.amendedSections,
+      title,
+      impactKind,
+    ),
+    dateAnnounced: item.dateIssued,
+    dateInForce: item.dateInForce ?? null,
+    sourceUrl: `https://www.finlex.fi/fi/laki/${kind}/${year}/${pad}`,
+    summary: shorten(title),
+    instrumentType,
+    statuteNumber: item.statuteNumber,
+    ...(item.eli ? { eli: item.eli } : {}),
+    ...(item.amendedSections?.length
+      ? { amendedSections: item.amendedSections }
+      : {}),
+    domainConfidence: "keyword",
+  };
+}

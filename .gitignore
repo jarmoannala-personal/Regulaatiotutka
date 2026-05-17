@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.vite/
+
+# Pipeline output is generated; the committed seed is the source of truth.
+/public/data/regulations.v1.json
+
+# Local deploy helper (server details — not for the public repo)
+push_to_idle.sh

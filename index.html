@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regulaatiotutka — lainsäädännön muutostutka</title>
+    <meta
+      name="description"
+      content="Suomen ja EU:n yritysrelevantin lainsäädännön muutokset aikajanalla, tutkanäkymässä."
+    />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Full-bleed radar canvas -->
+      <div id="stage" class="stage"></div>
+
+      <!-- Top bar overlay -->
+      <header class="topbar">
+        <div class="brand">
+          <h1>Regulaatiotutka</h1>
+          <span class="brand-sub">Lainsäädännön muutostutka · 2000–2026</span>
+        </div>
+        <div class="topbar-controls">
+          <div class="switcher-group">
+            <span class="switcher-label">Sektorit</span>
+            <div id="switcher"></div>
+          </div>
+        </div>
+        <div id="data-banner" class="data-banner" hidden></div>
+      </header>
+
+      <!-- Right dock: legend + timeline-following feed -->
+      <div id="rightdock" class="rightdock">
+        <div id="legend" class="legend-panel"></div>
+        <div id="feed" class="feed-panel"></div>
+      </div>
+
+      <!-- Detail drawer overlay -->
+      <aside id="detail-panel" class="detail-panel" hidden></aside>
+
+      <!-- Bottom timeline bar overlay -->
+      <section id="timeline" class="timeline-bar"></section>
+
+      <footer class="attribution">
+        Lähteet: Finlex (avoin data) · EUR-Lex / Euroopan unioni · EuroVoc CC BY
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
