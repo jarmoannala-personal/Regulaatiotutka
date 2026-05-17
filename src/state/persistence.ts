@@ -10,7 +10,7 @@ import { PERSISTED_KEYS } from "./appState";
 const STORAGE_KEY = "regulaatiotutka.state.v2";
 
 const DIMENSIONS: CategoryDimension[] = ["domain", "jurisdiction", "impact"];
-const SPEEDS: PlaySpeed[] = [0.5, 1, 2, 4];
+const SPEEDS: PlaySpeed[] = [0.1, 0.5, 1, 2, 4];
 
 /**
  * Deep-merge persisted state over `defaults`, validating every field so a

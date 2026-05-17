@@ -3,6 +3,7 @@ import type { RegulationEvent } from "../../shared/schema";
 import type { AppState } from "../state/appState";
 import { colorForEvent } from "../util/colors";
 import { formatDate } from "../util/format";
+import { isFiltered, matchesQuery } from "../util/match";
 import type { RadarGeometry } from "./geometry";
 
 const IMPACT_RADIUS = { low: 3.5, medium: 5.5, high: 8 } as const;
@@ -15,16 +16,6 @@ function getTooltip(): HTMLDivElement {
     document.body.appendChild(tooltip);
   }
   return tooltip;
-}
-
-/** Is the event hidden by the active facet filters? */
-function isFiltered(event: RegulationEvent, f: AppState["filters"]): boolean {
-  if (f.domains.length && !f.domains.includes(event.domain)) return true;
-  if (f.jurisdictions.length && !f.jurisdictions.includes(event.jurisdiction)) {
-    return true;
-  }
-  if (f.impact.length && !f.impact.includes(event.impactTier)) return true;
-  return false;
 }
 
 export interface BlipCallbacks {
@@ -91,7 +82,11 @@ export function renderBlips(
     .attr("cy", (d) => geom.placeBlip(d).y)
     .attr("fill", (d) => colorForEvent(d, state.dimension))
     .classed("selected", (d) => d.id === state.selectedEventId)
-    .classed("dimmed", (d) => isFiltered(d, state.filters));
+    .classed(
+      "dimmed",
+      (d) =>
+        isFiltered(d, state.filters) || !matchesQuery(d, state.query),
+    );
 }
 
 /** Briefly pulse the given blips (the "lightbulb" flash). */

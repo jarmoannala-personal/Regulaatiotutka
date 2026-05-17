@@ -3,6 +3,7 @@ import type { RegulationEvent } from "../shared/schema";
 import { renderCategorySwitcher } from "./controls/categorySwitcher";
 import { enableDockResize } from "./controls/dockResize";
 import { renderLegend } from "./controls/legend";
+import { setupSearch } from "./controls/search";
 import { TimelineControl } from "./controls/timeline";
 import { loadDataset } from "./data/loadDataset";
 import { setupAbout } from "./panel/about";
@@ -58,6 +59,9 @@ async function boot(): Promise<void> {
 
   setupAbout(document.querySelector<HTMLElement>(".topbar-controls")!);
   enableDockResize(document.getElementById("rightdock")!);
+  setupSearch(document.getElementById("search")!, (q) =>
+    store.set({ query: q }),
+  );
 
   const radar = new RadarComponent(
     stageEl,

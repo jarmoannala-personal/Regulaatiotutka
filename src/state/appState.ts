@@ -8,7 +8,7 @@ import { DOMAINS, IMPACT_TIERS, JURISDICTIONS } from "../../shared/schema";
 /** Which dimension the radar's angular sectors encode. */
 export type CategoryDimension = "domain" | "jurisdiction" | "impact";
 
-export type PlaySpeed = 0.5 | 1 | 2 | 4;
+export type PlaySpeed = 0.1 | 0.5 | 1 | 2 | 4;
 
 export interface AppState {
   /** Angular-sector dimension. Persisted. */
@@ -27,6 +27,8 @@ export interface AppState {
     jurisdictions: Jurisdiction[];
     impact: ImpactTier[];
   };
+  /** Transient: free-text search, ANDed with filters + time cursor. */
+  query: string;
   /** Transient: blip open in the detail panel. */
   selectedEventId: string | null;
 }
@@ -53,6 +55,7 @@ export function defaultState(coverage: {
     // appear over time.
     timelinePosition: Date.UTC(coverage.fromYear, 0, 1),
     filters: { domains: [], jurisdictions: [], impact: [] },
+    query: "",
     selectedEventId: null,
   };
 }

@@ -3,6 +3,7 @@ import type { RegulationEvent } from "../../shared/schema";
 import type { AppState } from "../state/appState";
 import { shortCategoryLabel } from "../util/format";
 import { colorForCategory } from "../util/colors";
+import { passesFiltersAndQuery } from "../util/match";
 import { flashBlips, renderBlips } from "./blips";
 import { createGeometry, type RadarGeometry } from "./geometry";
 
@@ -206,25 +207,20 @@ export class RadarComponent {
     }
     this.prevTime = state.timelinePosition;
 
-    // Empty state when nothing is visible under current cursor + filters.
+    // Empty state when nothing is visible under cursor + filters + search.
     const f = state.filters;
-    const anyVisible = events.some((e) => {
-      const t = new Date(`${e.dateAnnounced}T12:00:00Z`).getTime();
-      if (t > state.timelinePosition) return false;
-      if (f.domains.length && !f.domains.includes(e.domain)) return false;
-      if (
-        f.jurisdictions.length &&
-        !f.jurisdictions.includes(e.jurisdiction)
-      ) {
-        return false;
-      }
-      if (f.impact.length && !f.impact.includes(e.impactTier)) return false;
-      return true;
-    });
+    const anyVisible = events.some(
+      (e) =>
+        new Date(`${e.dateAnnounced}T12:00:00Z`).getTime() <=
+          state.timelinePosition && passesFiltersAndQuery(e, state),
+    );
     this.layers.empty.selectAll("*").remove();
     if (!anyVisible) {
-      const hasFilters =
-        f.domains.length || f.jurisdictions.length || f.impact.length;
+      const narrowed =
+        f.domains.length ||
+        f.jurisdictions.length ||
+        f.impact.length ||
+        state.query.trim().length > 0;
       const anyEverByNow = events.some(
         (e) =>
           new Date(`${e.dateAnnounced}T12:00:00Z`).getTime() <=
@@ -236,8 +232,8 @@ export class RadarComponent {
         .attr("x", g.cx)
         .attr("y", g.cy)
         .text(
-          hasFilters && anyEverByNow
-            ? "Ei muutoksia valituilla suodattimilla"
+          narrowed && anyEverByNow
+            ? "Ei osumia — väljennä suodattimia tai hakua"
             : "▶  Toista tai raahaa aikajanaa nähdäksesi muutokset",
         );
     }

@@ -2,20 +2,12 @@ import type { RegulationEvent } from "../../shared/schema";
 import type { AppState } from "../state/appState";
 import { colorForEvent } from "../util/colors";
 import { yearOf } from "../util/format";
+import { passesFiltersAndQuery } from "../util/match";
 
 /** Keep the DOM light; the newest slice is what "follows" the timeline. */
 const MAX_ROWS = 150;
 
 let prevIds = new Set<string>();
-
-function isFiltered(e: RegulationEvent, f: AppState["filters"]): boolean {
-  if (f.domains.length && !f.domains.includes(e.domain)) return true;
-  if (f.jurisdictions.length && !f.jurisdictions.includes(e.jurisdiction)) {
-    return true;
-  }
-  if (f.impact.length && !f.impact.includes(e.impactTier)) return true;
-  return false;
-}
 
 /**
  * Render the timeline-following feed: every event that has "appeared" by the
@@ -34,7 +26,7 @@ export function renderFeed(
     .filter(
       (e) =>
         new Date(`${e.dateAnnounced}T12:00:00Z`).getTime() <= cursor &&
-        !isFiltered(e, state.filters),
+        passesFiltersAndQuery(e, state),
     )
     .sort((a, b) => b.dateAnnounced.localeCompare(a.dateAnnounced));
 

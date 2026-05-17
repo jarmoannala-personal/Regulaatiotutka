@@ -1,7 +1,7 @@
 import { drag, pointer, range, scaleTime, select, type Selection } from "d3";
 import type { AppState, PlaySpeed } from "../state/appState";
 
-const SPEEDS: PlaySpeed[] = [0.5, 1, 2, 4];
+const SPEEDS: PlaySpeed[] = [0.1, 0.5, 1, 2, 4];
 const H = 46;
 const PAD = 18;
 
