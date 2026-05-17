@@ -8,13 +8,23 @@ function clamp(w: number): number {
 
 /**
  * Make the right dock horizontally resizable via a left-edge handle.
- * The chosen width is persisted so the feed stays as wide as the user likes.
+ * The width is persisted and mirrored to the `--dock-w` CSS variable so the
+ * stage (radar/trend/graph) reflows to fill the space *next to* the dock
+ * rather than being covered by it.
  */
 export function enableDockResize(dock: HTMLElement): void {
+  const setWidth = (w: number) => {
+    const cw = clamp(w);
+    dock.style.width = `${cw}px`;
+    document.documentElement.style.setProperty("--dock-w", `${cw}px`);
+  };
+
   const stored = Number(localStorage.getItem(KEY));
-  if (Number.isFinite(stored) && stored >= MIN) {
-    dock.style.width = `${clamp(stored)}px`;
-  }
+  setWidth(
+    Number.isFinite(stored) && stored >= MIN
+      ? stored
+      : dock.getBoundingClientRect().width || 244,
+  );
 
   const handle = document.createElement("div");
   handle.className = "dock-resize";
@@ -26,8 +36,7 @@ export function enableDockResize(dock: HTMLElement): void {
 
   const onMove = (e: PointerEvent) => {
     // Dock is right-anchored: dragging left widens it.
-    const w = clamp(startW + (startX - e.clientX));
-    dock.style.width = `${w}px`;
+    setWidth(startW + (startX - e.clientX));
   };
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);

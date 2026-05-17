@@ -70,6 +70,18 @@ async function boot(): Promise<void> {
     store.set({ query: q }),
   );
 
+  // Keep the stage clear of the (variable-height) top bar and timeline bar.
+  const topbarEl = document.querySelector<HTMLElement>(".topbar")!;
+  const timelineBarEl = document.getElementById("timeline")!;
+  const syncLayoutVars = () => {
+    const root = document.documentElement.style;
+    root.setProperty("--topbar-h", `${topbarEl.offsetHeight + 12}px`);
+    root.setProperty("--timeline-h", `${timelineBarEl.offsetHeight + 8}px`);
+  };
+  new ResizeObserver(syncLayoutVars).observe(topbarEl);
+  new ResizeObserver(syncLayoutVars).observe(timelineBarEl);
+  syncLayoutVars();
+
   const radar = new RadarComponent(
     radarHost,
     timeDomain,
