@@ -1,0 +1,118 @@
+# CLAUDE.md — Regulaatiotutka
+
+Project memory for Claude Code. General working preferences live in
+`~/dev/claude-memory/`; source-API gotchas for Finlex and EUR-Lex live in
+`~/dev/claude-memory/finlex-opendata-api.md`. This file holds what is specific
+to **this** repo.
+
+## What this is
+
+A static, backend-free visualization of Finnish and EU legislative change
+2000→current year, aimed at companies (see `README.md` for the product story
+and the three views). Vite + TypeScript + D3, no UI framework. Deployed to
+GitHub Pages by `.github/workflows/deploy.yml` on push to `main`.
+
+## Data model: the seed is the source of truth
+
+- `pipeline/seed/seed-events.json` is **hand-curated and committed** — 78
+  landmark FI/EU acts with hand-written Finnish summaries and deliberate impact
+  tiers. It is the offline fallback and the baseline coverage promise.
+- `public/data/regulations.v1.json` is **generated and gitignored**. Never edit
+  it, and never treat it as a record of anything — every build overwrites it.
+- `shared/schema.ts` is the single contract shared by pipeline and frontend.
+  Changing it means changing both sides.
+- Live data wins over the seed on id clashes (`dedupeEvents(live, seed)`), and
+  seed ids are exempt from the `MAX_EVENTS` cap (`capEvents(..., seedIds)`), so
+  a growing live result set can never push a curated landmark off the radar.
+
+### Editing the seed — verification is mandatory
+
+Wrong statute numbers, rates and dates are the failure mode that matters here:
+this app looks authoritative, so a fabricated reference is worse than a missing
+one. A 2026-08 audit found a VAT entry whose statute number pointed at an
+unrelated kipsikäsittely subsidy decree, plus four dates taken from OJ
+publication instead of adoption.
+
+**Never write a statute number, rate, date or summary from memory.** Fetch the
+act and read it:
+
+```sh
+# statute as published (this is where amendment laws live)
+curl -s "https://opendata.finlex.fi/finlex/avoindata/v1/akn/fi/act/statute/2025/1390/fin@"
+```
+
+Then run both checks:
+
+```sh
+npm run validate:seed   # offline: shape, ids, domains, dates in range, summary ≤280
+npm run verify:seed     # network: every statuteNumber/CELEX resolves, dates match source
+npm run verify:seed -- fi:10/2026 eu:32026L0470   # just the entries you touched
+```
+
+`validate:seed` runs in CI before the build. `verify:seed` is network-bound and
+rate-limited, so it is manual/periodic — run it after every seed edit and
+occasionally to catch drift. **Neither script can check whether a summary is
+*true*** — that is on the author, from the statute text.
+
+Conventions for new entries:
+
+- FI id `fi:{statuteNumber}`, EU id `eu:{celex}` — `validate:seed` enforces the
+  match.
+- `dateAnnounced` = Finlex `dateIssued` / CELLAR `work_date_document`
+  (**adoption**, not OJ publication) so seed and live data land on the same
+  point of the timeline.
+- Source URLs: `finlex.fi/fi/lainsaadanto/{year}/{num}` (consolidated) or
+  `…/lainsaadanto/saadoskokoelma/{year}/{num}` (as published); EUR-Lex
+  `legal-content/FI/TXT/?uri=CELEX:{celex}`. The old `/fi/laki/ajantasa/…`
+  paths only 308-redirect.
+- Summaries: Finnish, ≤280 chars, plain language, state what changed and for
+  whom. Finnish typography — en dash `–` not `—`, comma before *vaan*/*mutta*,
+  `25,5 %` with a space.
+- Only the eight domains in `shared/schema.ts`. If a law does not fit one, leave
+  it out rather than forcing a misleading tag (that is why the CER critical-
+  infrastructure act and Yleistukilaki are not in the seed — and note
+  Yleistukilaki 48/2026 is unemployment benefit, not business subsidy).
+
+## Pipeline behaviour worth knowing
+
+- `TO_YEAR` derives from the current year — do not pin it again.
+- **Three live sources.** Finlex `statute-consolidated` (acts in force, all
+  years), Finlex `statute` = säädöskokoelma (recent amending acts — the
+  consolidated set never contains "Laki X:n muuttamisesta", so without this
+  crawl no amendment is visible), and EUR-Lex CELLAR.
+- **The two Finlex crawls must stay sequential, amendments first, with
+  `FINLEX_COOLDOWN_MS` between them.** In parallel they 429 each other out
+  ("all years failed"); back to back, the consolidated crawl's throttling
+  swallows the amendment crawl whole. Both failure modes were observed.
+  Amendments go first because they are the freshest and the scarcest.
+- Finlex fetches **newest year first** under a per-crawl wall-clock budget, so a
+  throttled run loses breadth in the 2000s rather than this year's statutes.
+  Expect the amendment crawl to cover roughly the current year per build —
+  Finlex's throttle allows only a few hundred requests before 429s, and the
+  säädöskokoelma returns every statute **twice** at 10 per page (an API quirk,
+  not filterable), so a single year is ~300 pages.
+- Finlex 429s are aggressive and any bulk scan poisons the next few minutes;
+  backoff is seconds with `Retry-After`. If a local run shows many
+  "429 backoff exhausted" lines, wait before re-running rather than tuning.
+- `MAX_EVENTS` (2500) exempts the seed **and** everything from `KEEP_FROM_YEAR`
+  onwards. The cap may only cost historical breadth, never recent law.
+- Amendment metadata is parsed, not given: the säädöskokoelma carries no
+  `inForce` field, so `dateInForce` comes from the statute's own closing
+  formula ("Tämä laki tulee voimaan 1 päivänä tammikuuta 2026") and
+  `amendedSections` from the title. Both parsers are exported from
+  `sources/finlex.ts` and are the right place to add a regression test if they
+  ever misfire.
+- The pipeline **always exits 0**. A data-source outage must never fail the
+  build — it degrades to `origin: "seed-fallback"` and the UI shows a banner.
+- `pipeline/normalize/domainMap.ts` is what decides whether a live law appears
+  at all. Finnish inflection matters: `\bdata\b` never matches "datan". When a
+  known law is missing from the dataset, check this file first.
+- For frontend-only work run `npx vite` directly — `npm run dev` runs the full
+  pipeline first (~9 min).
+
+## Conventions
+
+- Version bumps: `npm run bump` (patch) or edit `version` for a minor; the
+  version, git SHA and build date show in the in-app *Tietoja* dialog.
+- Significant decisions go in `decisions/YYYY-MM-DD-{topic}.md`.
+- Non-urgent follow-ups go in `IDEAS.md` (nothing there is committed work).

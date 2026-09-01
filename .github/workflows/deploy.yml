@@ -3,6 +3,12 @@ name: Build & deploy
 on:
   push:
     branches: [main]
+  # Deploying is the only thing that refreshes the data: the pipeline runs at
+  # build time, so without a push the dataset is as old as the last commit.
+  # Monthly is the natural cadence — Finnish statutes are confirmed in batches
+  # and the säädöskokoelma crawl covers the current year on every run.
+  schedule:
+    - cron: "0 5 1 * *"
   workflow_dispatch:
 
 permissions:
@@ -24,6 +30,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The seed is the offline fallback for the whole app — fail fast if a
+      # hand-edit broke the data contract.
+      - run: npm run validate:seed
       # `npm run build` runs the data pipeline (prebuild) then vite build.
       # The pipeline always exits 0 and falls back to the committed seed if
       # Finlex/EUR-Lex are unreachable, so the build never fails on data.
