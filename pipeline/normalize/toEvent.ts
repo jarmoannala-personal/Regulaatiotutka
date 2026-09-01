@@ -94,8 +94,11 @@ export function normalizeFinlex(item: FinlexItem): RegulationEvent | null {
         ? "fi-decree"
         : "fi-other";
   const [num, year] = item.statuteNumber.split("/");
-  const pad = `${year}${num.padStart(4, "0")}`;
-  const kind = item.isAmendment ? "alkup" : "ajantasa";
+  // Current finlex.fi URL scheme. The older /fi/laki/{ajantasa,alkup}/… paths
+  // only 308-redirect here, so link to the canonical target directly.
+  const path = item.isAmendment
+    ? `lainsaadanto/saadoskokoelma/${year}/${num}`
+    : `lainsaadanto/${year}/${num}`;
 
   return {
     id: `fi:${item.statuteNumber}`,
@@ -110,7 +113,7 @@ export function normalizeFinlex(item: FinlexItem): RegulationEvent | null {
     ),
     dateAnnounced: item.dateIssued,
     dateInForce: item.dateInForce ?? null,
-    sourceUrl: `https://www.finlex.fi/fi/laki/${kind}/${year}/${pad}`,
+    sourceUrl: `https://www.finlex.fi/fi/${path}`,
     summary: shorten(title),
     instrumentType,
     statuteNumber: item.statuteNumber,

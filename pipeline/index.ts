@@ -2,11 +2,11 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { RegulationEvent } from "../shared/schema.js";
-import { FROM_YEAR, SEED_PATH, TO_YEAR } from "./config.js";
+import { FINLEX_COOLDOWN_MS, FROM_YEAR, SEED_PATH, TO_YEAR } from "./config.js";
 import { capEvents, dedupeEvents, withinCoverage } from "./dedupe.js";
 import { fetchEurLex } from "./sources/eurlex.js";
 import { fetchEurLexEdges } from "./sources/eurlexEdges.js";
-import { fetchFinlex } from "./sources/finlex.js";
+import { fetchFinlex, fetchFinlexAmendments } from "./sources/finlex.js";
 import { buildDataset, writeDataset } from "./writeDataset.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,23 +33,39 @@ async function loadSeed(): Promise<RegulationEvent[]> {
 }
 
 async function main(): Promise<void> {
-  const [finlex, eurlex, seed] = await Promise.all([
-    runSource("finlex", fetchFinlex),
+  // The two Finlex crawls hit the same rate-limited host, so they run in
+  // sequence with a cooldown — in parallel they simply 429 each other out, and
+  // back to back the first one's throttling eats the second one whole.
+  // Amendments go first: they are the freshest change events and the ones the
+  // consolidated set cannot show at all. EUR-Lex is a different service and
+  // runs alongside them.
+  const [[amendments, finlex], eurlex, seed] = await Promise.all([
+    (async () => {
+      const amend = await runSource("finlex-amendments", fetchFinlexAmendments);
+      await new Promise((r) => setTimeout(r, FINLEX_COOLDOWN_MS));
+      return [amend, await runSource("finlex", fetchFinlex)] as const;
+    })(),
     runSource("eurlex", fetchEurLex),
     loadSeed(),
   ]);
 
-  const live = [...finlex, ...eurlex];
-  // Seed is always merged for baseline coverage; live data wins on id clashes.
+  // Consolidated first: for a statute present in both sets its metadata is
+  // richer (entry into force, ELI), and dedupe keeps the first id it sees.
+  const live = [...finlex, ...amendments, ...eurlex];
+  // Seed is always merged for baseline coverage; live data wins on id clashes,
+  // and seed ids are never dropped by the size cap.
+  const seedIds = new Set(seed.map((e) => e.id));
   const merged = capEvents(
     withinCoverage(dedupeEvents(live, seed), FROM_YEAR, TO_YEAR),
+    seedIds,
   );
 
   const origin = live.length > 0 ? "pipeline" : "seed-fallback";
   const sourceVersion = [
     finlex.length ? "finlex-rest-v1" : null,
+    amendments.length ? "finlex-saadoskokoelma" : null,
     eurlex.length ? "eurlex-cellar" : null,
-    "seed-2026-05",
+    "seed-2026-08",
   ]
     .filter(Boolean)
     .join("+");

@@ -11,19 +11,25 @@ export const EUROVOC_TO_DOMAIN: Record<string, Domain> = {
   "524": "corporate_governance", // commercial law
   "1122": "corporate_governance", // merger
   "2889": "corporate_governance", // business name
+  "960": "corporate_governance", // bankruptcy
   // tax & duties
   "561": "tax_duties", // tax law
   "1313": "tax_duties", // direct tax
   "1331": "tax_duties", // corporation tax
   "924": "tax_duties", // tax avoidance
+  "4585": "tax_duties", // VAT
+  "4392": "tax_duties", // VAT rate
   // accounting & reporting
   "54": "accounting_reporting", // accounting
   "4675": "accounting_reporting", // auditing
+  "7942": "accounting_reporting", // corporate social responsibility
   // employment & labour
   "557": "employment_labour", // labour law
   "82": "employment_labour", // working conditions
   // data protection
   "5181": "data_protection", // data protection
+  "5595": "data_protection", // personal data
+  "3030": "data_protection", // artificial intelligence
   // financial & securities
   "1804": "financial_securities", // financial market
   "560": "financial_securities", // financial legislation
@@ -67,8 +73,9 @@ export function domainFromEurovoc(conceptIds: string[]): Domain | null {
 export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
   {
     domain: "data_protection",
+    // `data\w*` (not `\bdata\b`) so Finnish inflections like "datan" match.
     pattern:
-      /tietosuoja|henkilötiet|yksityisyy|tekoäly|\bdata\b|tietoturv/i,
+      /tietosuoja|henkilötiet|yksityisyy|tekoäly|\bdata\w*|tietoturv|kyberturv|kyberkestäv/i,
   },
   {
     domain: "accounting_reporting",
@@ -76,8 +83,10 @@ export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
   },
   {
     domain: "tax_duties",
+    // `\bmaksu(t|…)\b` only as a standalone word: bare `maksu` used to swallow
+    // maksupalvelu-, seuraamusmaksu- and asiakasmaksu-titles into tax.
     pattern:
-      /\bvero|arvonlisävero|tulovero|valmistevero|verotus|tullin?|maksu/i,
+      /\bvero|arvonlisävero|tulovero|valmistevero|verotus|tullin?|\bmaksu(t|ja|jen|ista|sta|n)?\b/i,
   },
   {
     domain: "employment_labour",
@@ -87,7 +96,7 @@ export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
   {
     domain: "financial_securities",
     pattern:
-      /arvopaperi|sijoitus|luottolaito|rahanpes|maksupalvelu|rahoitus|vakuutus|pankki/i,
+      /arvopaperi|sijoitus|luottolaito|luotonost|luotonhallinnoi|rahanpes|maksupalvelu|rahoitus|vakuutus|pankki|kryptovara|virtuaalivaluutta/i,
   },
   {
     domain: "competition",
@@ -100,7 +109,7 @@ export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
   {
     domain: "corporate_governance",
     pattern:
-      /osakeyhti|yhtiölaki|säätiö|yhdistys|liikesalaisuus|tavaramerkki|kaupparekisteri|elinkeino|yritys/i,
+      /osakeyhti|yhtiölaki|säätiö|yhdistys|liikesalaisuus|tavaramerkki|kaupparekisteri|elinkeino|yritys|maksukyvyttöm|konkurssi|yrityssaneeraus/i,
   },
 ];
 
