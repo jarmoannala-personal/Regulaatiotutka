@@ -9,8 +9,28 @@ to **this** repo.
 
 A static, backend-free visualization of Finnish and EU legislative change
 2000→current year, aimed at companies (see `README.md` for the product story
-and the three views). Vite + TypeScript + D3, no UI framework. Deployed to
-GitHub Pages by `.github/workflows/deploy.yml` on push to `main`.
+and the three views). Vite + TypeScript + D3, no UI framework.
+
+## Deployment: two targets, and the live one is manual
+
+- **auski.idle.fi is the site people actually look at**:
+  `https://auski.idle.fi/Regulaatiotutka/`. `./push_to_idle.sh` scp's `dist/*`
+  to `auski@idle.fi:~/reg/`, which the host serves at the `/Regulaatiotutka/`
+  URL path. That means the default Vite `base` (`/Regulaatiotutka/`) is already
+  correct for this target — **do not** set `VITE_BASE` for it, or every asset
+  404s.
+- **The script publishes, it does not build.** It copies whatever is sitting in
+  `dist/`. Run `npm run build` first (~9 min, pipeline included) or you
+  republish an old dataset — the in-app *Tietoja* build date is what gives it
+  away.
+- **GitHub Pages** (`jarmoannala-personal.github.io/Regulaatiotutka/`) is built
+  by `.github/workflows/deploy.yml` on push to `main`, on the monthly cron
+  (`0 5 1 * *`), or via `workflow_dispatch`. Pages was only enabled on
+  2026-09-01; every earlier run failed at `configure-pages@v5` because the repo
+  had no Pages site, which went unnoticed precisely because idle.fi is the real
+  deployment.
+- **The two copies drift.** Pages refreshes itself monthly; idle.fi refreshes
+  only when someone builds and runs the script.
 
 ## Data model: the seed is the source of truth
 

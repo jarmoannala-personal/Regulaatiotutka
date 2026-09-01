@@ -103,10 +103,21 @@ npm run preview    # serve the production build
 
 ## Deploy
 
-`.github/workflows/deploy.yml` runs the pipeline + build and publishes `dist/`
-to GitHub Pages on push to `main`. The Vite `base` defaults to
-`/Regulaatiotutka/`; override with the `VITE_BASE` env var for other hosts
-(e.g. `VITE_BASE=/ npm run build` for Netlify root).
+Two targets.
+
+**auski.idle.fi** — <https://auski.idle.fi/Regulaatiotutka/>, the live site.
+`./push_to_idle.sh` scp's `dist/*` to `auski@idle.fi:~/reg/`, served at the
+`/Regulaatiotutka/` path. It publishes, it does not build: run `npm run build`
+first or you republish the previous dataset.
+
+**GitHub Pages** — `.github/workflows/deploy.yml` runs the pipeline + build and
+publishes `dist/` on push to `main`, on a monthly schedule (`0 5 1 * *`) and on
+`workflow_dispatch`. The schedule exists because the pipeline runs at build
+time: without a build, the data is as old as the last push.
+
+Both targets sit under a `/Regulaatiotutka/` path, which is what the Vite `base`
+default assumes. Override with the `VITE_BASE` env var only for a host that
+serves from somewhere else (e.g. `VITE_BASE=/ npm run build` for Netlify root).
 
 Attribution shown in-app footer: *Lähteet: Finlex (avoin data), EUR-Lex /
 Euroopan unioni. EuroVoc CC BY. EU-sisältö CC BY 4.0.*
