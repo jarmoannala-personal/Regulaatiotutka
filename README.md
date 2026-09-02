@@ -6,7 +6,7 @@ yhdistys): corporate governance, tax, accounting, employment, data protection,
 financial/securities, competition and environment.
 
 A timeline scrubber (2000→2026, with 0.1×–4× auto-play) is the primary
-control across three switchable **views**, all sharing the same dimension
+control across four switchable **views**, all sharing the same dimension
 switch (legal domain / Finland vs EU / impact), legend filters and search:
 
 - **Tutka (radar)** — sweep radar: radial distance encodes time (outer =
@@ -18,6 +18,12 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   legal relationships (amends / repeals / based-on, ~1000 edges) with
   wheel/trackpad-pinch zoom and drag-pan; self-degrades to an empty note
   when filtered too sparse.
+- **Lista (list)** — every match newest-first, with month dividers and
+  heavier sticky year dividers, its own domain / FI–EU filter chips and
+  incremental rendering (200 rows per chunk, extended on scroll — no
+  pagination). The one view that ignores the timeline cursor: it browses
+  the whole corpus, so the timeline bar and the dock feed hide while it is
+  open.
 
 Hover any item for a summary, click for the official source. A right-hand
 dock holds a free-text search, the legend (click to filter), and a

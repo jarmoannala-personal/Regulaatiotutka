@@ -10,11 +10,11 @@ export type CategoryDimension = "domain" | "jurisdiction" | "impact";
 
 export type PlaySpeed = 0.1 | 0.5 | 1 | 2 | 4;
 
-/** Main visualization: the sweep radar or the area-trend chart. */
-export type ViewMode = "radar" | "trend" | "graph";
+/** Main visualization: radar, trend chart, relationship graph or list. */
+export type ViewMode = "radar" | "trend" | "graph" | "list";
 
 export interface AppState {
-  /** Radar vs trend chart. Persisted. */
+  /** Which main visualization is showing. Persisted. */
   view: ViewMode;
   /** Angular-sector dimension. Persisted. */
   dimension: CategoryDimension;

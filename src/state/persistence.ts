@@ -40,7 +40,8 @@ export function loadPersisted(defaults: AppState): AppState {
   if (
     parsed.view === "radar" ||
     parsed.view === "trend" ||
-    parsed.view === "graph"
+    parsed.view === "graph" ||
+    parsed.view === "list"
   ) {
     next.view = parsed.view;
   }

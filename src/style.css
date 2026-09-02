@@ -252,6 +252,10 @@ body {
   border-radius: 10px;
   overflow: hidden;
 }
+.feed-panel[hidden],
+.timeline-bar[hidden] {
+  display: none;
+}
 .feed-head {
   flex: 0 0 auto;
   padding: 12px 16px 9px;
@@ -526,6 +530,212 @@ body {
   color: #fff;
 }
 
+
+/* ---- Lista: reverse-chronological list view ---- */
+.view-host.list-host {
+  align-items: stretch;
+  justify-content: stretch;
+}
+.list-view {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Left aligns with the brand; the bottom band keeps the source credit
+     (which the hidden timeline bar no longer leaves room for) off the rows. */
+  padding: 2px 2px 42px 24px;
+}
+.list-filters {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.list-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.list-filter-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+.list-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 11px 4px 9px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+}
+.list-chip:hover {
+  color: var(--ink);
+  border-color: var(--faint);
+}
+.list-chip.on {
+  background: linear-gradient(180deg, #2a3a78, #1f2c5c);
+  border-color: #3a4c94;
+  color: #fff;
+}
+.list-chip.inactive {
+  opacity: 0.42;
+}
+.list-clear {
+  padding: 4px 12px;
+  color: var(--accent);
+}
+.list-chip-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.list-count {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.list-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.list-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 5px;
+}
+/* Two-level sticky: the year sits at the top, the month right under it, so
+   the month offset must match the year divider's height. */
+.list-year {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: rgba(9, 13, 33, 0.95);
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.list-month {
+  position: sticky;
+  top: 46px;
+  z-index: 2;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  background: rgba(9, 13, 33, 0.92);
+  border-bottom: 1px solid var(--line-soft);
+}
+.list-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.list-row:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+.list-row.selected {
+  background: rgba(56, 232, 255, 0.09);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.list-date {
+  flex: 0 0 42px;
+  text-align: right;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.list-swatch {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+.list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list-title {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.list-sub {
+  font-size: 0.67rem;
+  color: var(--faint);
+}
+.list-link {
+  flex: 0 0 auto;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0 2px;
+}
+.list-link:hover {
+  color: var(--accent);
+}
+.list-empty {
+  padding: 24px 16px;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+.list-sentinel {
+  height: 1px;
+}
+
 /* ---- Bottom timeline bar ---- */
 .timeline-bar {
   position: absolute;
@@ -646,6 +856,10 @@ body {
   color: var(--faint);
   z-index: 4;
   pointer-events: none;
+}
+/* No timeline bar in the list view — drop the credit to the very bottom. */
+body.view-list .attribution {
+  bottom: 12px;
 }
 
 /* ---- Top-bar controls + About ---- */

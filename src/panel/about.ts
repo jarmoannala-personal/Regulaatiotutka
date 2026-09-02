@@ -9,10 +9,11 @@ function buildOverlay(): HTMLDivElement {
       <h2>Regulaatiotutka</h2>
       <p class="about-tagline">
         Suomen ja EU:n yritysrelevantin lainsäädännön muutokset aikajanalla
-        2000–2026. Kolme näkymää: <strong>Tutka</strong> (säädökset
+        2000–2026. Neljä näkymää: <strong>Tutka</strong> (säädökset
         aikakehällä), <strong>Trendi</strong> (vuosittainen kehitys
-        oikeudenaloittain) ja <strong>Graafi</strong> (säädösten väliset
-        suhteet — kokeellinen). Vaihda sektorointi, suodata selitteestä, hae
+        oikeudenaloittain), <strong>Graafi</strong> (säädösten väliset
+        suhteet — kokeellinen) ja <strong>Lista</strong> (kaikki säädökset
+        uusimmasta vanhimpaan). Vaihda sektorointi, suodata selitteestä, hae
         tekstillä.
       </p>
       <dl class="about-meta">

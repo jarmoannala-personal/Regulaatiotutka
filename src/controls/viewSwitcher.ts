@@ -4,9 +4,10 @@ const VIEWS: { id: ViewMode; label: string }[] = [
   { id: "radar", label: "Tutka" },
   { id: "trend", label: "Trendi" },
   { id: "graph", label: "Graafi" },
+  { id: "list", label: "Lista" },
 ];
 
-/** Segmented control switching between the radar and the trend chart. */
+/** Segmented control switching between the main visualizations. */
 export function renderViewSwitcher(
   el: HTMLElement,
   current: ViewMode,

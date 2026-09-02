@@ -12,6 +12,7 @@ import { renderDetailPanel } from "./panel/detailPanel";
 import { renderFeed } from "./panel/feed";
 import { renderViewSwitcher } from "./controls/viewSwitcher";
 import { GraphComponent } from "./graph/graph";
+import { ListComponent } from "./list/list";
 import { RadarComponent } from "./radar/radar";
 import { SweepDriver } from "./radar/sweep";
 import { TrendComponent } from "./trend/trend";
@@ -58,6 +59,7 @@ async function boot(): Promise<void> {
   const radarHost = document.getElementById("radar-host")!;
   const trendHost = document.getElementById("trend-host")!;
   const graphHost = document.getElementById("graph-host")!;
+  const listHost = document.getElementById("list-host")!;
   const switcherEl = document.getElementById("switcher")!;
   const viewSwitchEl = document.getElementById("viewswitch")!;
   const legendEl = document.getElementById("legend")!;
@@ -95,6 +97,11 @@ async function boot(): Promise<void> {
   const graph = new GraphComponent(graphHost, (e: RegulationEvent) =>
     store.set({ selectedEventId: e.id }),
   );
+  const list = new ListComponent(
+    listHost,
+    (e: RegulationEvent) => store.set({ selectedEventId: e.id }),
+    (filters) => store.set({ filters }),
+  );
 
   const timeline = new TimelineControl(timelineEl, timeDomain, {
     onScrub: (ms) =>
@@ -123,6 +130,8 @@ async function boot(): Promise<void> {
   window.addEventListener("keydown", (e) => {
     if (e.target instanceof HTMLInputElement) return;
     const s = store.get();
+    // The list view is not cursor-gated, so the timeline keys do nothing.
+    if (s.view === "list") return;
     if (e.code === "Space") {
       e.preventDefault();
       const atEnd = s.timelinePosition >= timeDomain[1].getTime() - 1000;
@@ -151,13 +160,23 @@ async function boot(): Promise<void> {
       radarHost.hidden = s.view !== "radar";
       trendHost.hidden = s.view !== "trend";
       graphHost.hidden = s.view !== "graph";
+      listHost.hidden = s.view !== "list";
+      // The list shows every match regardless of the cursor, so the timeline
+      // bar has nothing to say there — hide it and give the list its height.
+      // The dock feed is the cursor-following slice of the same data, so it
+      // would only be a confusing near-duplicate next to the list.
+      timelineEl.hidden = s.view === "list";
+      feedEl.hidden = s.view === "list";
+      document.body.classList.toggle("view-list", s.view === "list");
+      syncLayoutVars();
       renderViewSwitcher(viewSwitchEl, s.view, (view) =>
-        store.set({ view }),
+        store.set(view === "list" ? { view, playing: false } : { view }),
       );
     }
     if (s.view === "radar") radar.update(s, events);
     else if (s.view === "trend") trend.update(s, events);
-    else graph.update(s, events, edges);
+    else if (s.view === "graph") graph.update(s, events, edges);
+    else list.update(s, events);
     timeline.update(s);
     if (s.dimension !== lastDimension) {
       lastDimension = s.dimension;
@@ -166,9 +185,11 @@ async function boot(): Promise<void> {
       );
     }
     renderLegend(legendEl, s, (filters) => store.set({ filters }));
-    renderFeed(feedEl, events, s, (e) =>
-      store.set({ selectedEventId: e.id }),
-    );
+    if (s.view !== "list") {
+      renderFeed(feedEl, events, s, (e) =>
+        store.set({ selectedEventId: e.id }),
+      );
+    }
     renderDetailPanel(
       panelEl,
       events.find((e) => e.id === s.selectedEventId) ?? null,
