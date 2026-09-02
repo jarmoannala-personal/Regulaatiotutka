@@ -20,12 +20,17 @@ and the three views). Vite + TypeScript + D3, no UI framework.
   correct for this target — **do not** set `VITE_BASE` for it, or every asset
   404s.
 - **The script publishes, it does not build.** It copies whatever is sitting in
-  `dist/`. Run `npm run build` first (~9 min, pipeline included) or you
-  republish an old dataset — the in-app *Tietoja* build date is what gives it
-  away.
+  `dist/`. `npm run build` is now seconds and does **not** crawl — it keeps the
+  dataset already on disk (`prebuild` = `ensure:data`). Use `npm run build:all`
+  when the point is fresh data (~9 min). The in-app *Tietoja* build date and
+  the dataset's own `generatedAt` are separate for exactly this reason.
 - **GitHub Pages** (`jarmoannala-personal.github.io/Regulaatiotutka/`) is built
   by `.github/workflows/deploy.yml` on push to `main`, on the monthly cron
-  (`0 5 1 * *`), or via `workflow_dispatch`. Pages was only enabled on
+  (`0 5 1 * *`), or via `workflow_dispatch`. **Only the cron and
+  `workflow_dispatch` crawl** (`build:all`); a push rebuilds the site and
+  reuses the dataset already published, fetched by `ensure:data` from the live
+  mirrors. Pages is therefore load-bearing: it is the first mirror
+  `ensure:data` tries (idle.fi is the second). Pages was only enabled on
   2026-09-01; every earlier run failed at `configure-pages@v5` because the repo
   had no Pages site, which went unnoticed precisely because idle.fi is the real
   deployment.
@@ -127,8 +132,11 @@ Conventions for new entries:
 - `pipeline/normalize/domainMap.ts` is what decides whether a live law appears
   at all. Finnish inflection matters: `\bdata\b` never matches "datan". When a
   known law is missing from the dataset, check this file first.
-- For frontend-only work run `npx vite` directly — `npm run dev` runs the full
-  pipeline first (~9 min).
+- `npm run dev` and `npm run build` no longer crawl; `dev:all` / `build:all`
+  are the explicit refresh paths. `pipeline/ensureData.ts` is what makes that
+  safe — local file, then live mirror, then (cold checkout only) the crawl.
+  It validates what a mirror serves before writing, so an HTML error page can
+  never land in `public/data/`.
 
 ## Conventions
 

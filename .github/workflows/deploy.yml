@@ -1,14 +1,16 @@
 name: Build & deploy
 
 on:
+  # Code pushes rebuild the *site* only and republish the dataset that is
+  # already live (see the two build steps below).
   push:
     branches: [main]
-  # Deploying is the only thing that refreshes the data: the pipeline runs at
-  # build time, so without a push the dataset is as old as the last commit.
-  # Monthly is the natural cadence — Finnish statutes are confirmed in batches
-  # and the säädöskokoelma crawl covers the current year on every run.
+  # The schedule is what refreshes the *data*. Monthly is the natural cadence —
+  # Finnish statutes are confirmed in batches and the säädöskokoelma crawl
+  # covers the current year on every run.
   schedule:
     - cron: "0 5 1 * *"
+  # Manual data refresh between scheduled runs.
   workflow_dispatch:
 
 permissions:
@@ -33,10 +35,20 @@ jobs:
       # The seed is the offline fallback for the whole app — fail fast if a
       # hand-edit broke the data contract.
       - run: npm run validate:seed
-      # `npm run build` runs the data pipeline (prebuild) then vite build.
-      # The pipeline always exits 0 and falls back to the committed seed if
+      # A code push has no reason to re-crawl: the amendment crawl is
+      # throttle-bound and best-effort, so re-running it on an unrelated change
+      # can publish *less* data than is already live. `prebuild` (ensure:data)
+      # pulls the currently published dataset from the live site instead, and
+      # only falls back to crawling if no mirror answers.
+      - name: Build the site, reusing the published dataset
+        if: github.event_name == 'push'
+        run: npm run build
+      # Scheduled / manual runs are the ones that refresh the data. The
+      # pipeline always exits 0 and falls back to the committed seed if
       # Finlex/EUR-Lex are unreachable, so the build never fails on data.
-      - run: npm run build
+      - name: Refresh the dataset, then build
+        if: github.event_name != 'push'
+        run: npm run build:all
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

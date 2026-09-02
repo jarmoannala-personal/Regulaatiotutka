@@ -92,18 +92,29 @@ summary's accuracy; that comes from reading the statute (see `CLAUDE.md`).
 
 ```sh
 npm install
-npm run pipeline   # fetch + normalize -> public/data/regulations.v1.json
-npm run dev        # (predev runs the pipeline first) http://localhost:5173/Regulaatiotutka/
+npm run dev        # http://localhost:5173/Regulaatiotutka/ — no crawl
+npm run build      # typecheck -> vite build into dist/ — no crawl
 ```
 
-The pipeline takes ~9 min with live Finlex (two sequenced crawls plus a
-cooldown). For fast frontend iteration against
-an already-generated dataset, run **`npx vite`** directly (skips the pipeline).
+**Nothing crawls implicitly.** Data freshness is a function of time, not of
+when someone edits a stylesheet, so the ~9 min pipeline is never a side effect
+of building. `prebuild` runs `ensure:data`, which resolves the dataset in
+order: the local file, then the copy on a live mirror (both deployed sites
+serve it verbatim; `DATA_URL` overrides), and only crawls on a cold checkout
+with no mirror reachable.
+
+Refreshing the data is the explicit path:
+
+```sh
+npm run pipeline   # crawl + normalize -> public/data/regulations.v1.json (~9 min)
+npm run build:all  # pipeline, then build
+npm run dev:all    # pipeline, then dev server
+npm run ensure:data  # dataset without crawling (what prebuild runs)
+```
 
 ```sh
 npm run validate:seed  # data-contract check on the committed seed
 npm run typecheck  # app + pipeline projects
-npm run build      # prebuild pipeline -> typecheck -> vite build into dist/
 npm run preview    # serve the production build
 ```
 
@@ -114,12 +125,15 @@ Two targets.
 **auski.idle.fi** — <https://auski.idle.fi/Regulaatiotutka/>, the live site.
 `./push_to_idle.sh` scp's `dist/*` to `auski@idle.fi:~/reg/`, served at the
 `/Regulaatiotutka/` path. It publishes, it does not build: run `npm run build`
-first or you republish the previous dataset.
+for a code change (seconds, keeps the current data) or `npm run build:all` to
+ship fresh data.
 
-**GitHub Pages** — `.github/workflows/deploy.yml` runs the pipeline + build and
-publishes `dist/` on push to `main`, on a monthly schedule (`0 5 1 * *`) and on
-`workflow_dispatch`. The schedule exists because the pipeline runs at build
-time: without a build, the data is as old as the last push.
+**GitHub Pages** — `.github/workflows/deploy.yml` publishes `dist/` on push to
+`main`, on a monthly schedule (`0 5 1 * *`) and on `workflow_dispatch`. Code
+pushes rebuild the *site* and republish the dataset that is already live; the
+schedule and manual runs are what refresh the *data* (`npm run build:all`).
+Pushes therefore never re-roll the throttle-bound amendment crawl, which could
+otherwise publish less data than is already live.
 
 Both targets sit under a `/Regulaatiotutka/` path, which is what the Vite `base`
 default assumes. Override with the `VITE_BASE` env var only for a host that
