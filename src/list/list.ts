@@ -1,13 +1,7 @@
-import type {
-  Domain,
-  Jurisdiction,
-  RegulationEvent,
-} from "../../shared/schema";
+import type { Jurisdiction, RegulationEvent } from "../../shared/schema";
 import {
-  DOMAINS,
   DOMAIN_LABELS,
   INSTRUMENT_LABELS,
-  JURISDICTIONS,
   JURISDICTION_LABELS,
 } from "../../shared/schema";
 import type { AppState, ListSort } from "../state/appState";
@@ -56,20 +50,23 @@ const FLAG: Record<Jurisdiction, { fg: string }> = {
 };
 
 /**
- * Reverse-chronological list of every regulation, with month dividers and
- * heavier year dividers, its own oikeudenala / Suomi–EU filter chips, and
- * incremental rendering (200 rows at a time, extended as you scroll — no
- * pagination).
+ * Reverse-chronological list of every regulation, with month dividers, heavier
+ * year dividers and incremental rendering (200 rows at a time, extended as you
+ * scroll — no pagination).
+ *
+ * Filtering is **not** here: the dock's legend panel is the single home for it
+ * (in this view it shows every facet, not just the sector dimension), so the
+ * list's own toolbar carries nothing but the sort control.
  *
  * Unlike the radar, trend and dock feed this view deliberately ignores the
  * timeline cursor: it is the "browse everything" view, so `main.ts` hides the
  * timeline bar while it is active. Legend filters, the dimension switcher
- * (which colours the swatches) and the search box still apply, via the same
- * store, so the chips here and the dock legend stay in sync.
+ * (which colours the row swatches) and the search box all still apply, via the
+ * same store.
  */
 export class ListComponent {
   private view: HTMLElement;
-  private chips: HTMLElement;
+  private toolbar: HTMLElement;
   private head: HTMLElement;
   private scroll: HTMLElement;
   private body: HTMLElement;
@@ -82,21 +79,20 @@ export class ListComponent {
   private lastMonth = -1;
   private rowById = new Map<string, HTMLElement>();
   private lastDataKey = "";
-  private lastFilterKey = "";
+  private lastSort = "";
   private lastDimension = "";
   private lastSelected: string | null = null;
 
   constructor(
     private container: HTMLElement,
     private onSelect: (e: RegulationEvent) => void,
-    private onFilterChange: (filters: AppState["filters"]) => void,
     private onSortChange: (sort: ListSort) => void,
   ) {
     container.classList.add("list-host");
     this.view = document.createElement("div");
     this.view.className = "list-view";
-    this.chips = document.createElement("div");
-    this.chips.className = "list-filters";
+    this.toolbar = document.createElement("div");
+    this.toolbar.className = "list-toolbar";
     this.head = document.createElement("div");
     this.head.className = "list-count";
     this.scroll = document.createElement("div");
@@ -106,7 +102,7 @@ export class ListComponent {
     this.sentinel = document.createElement("div");
     this.sentinel.className = "list-sentinel";
     this.scroll.append(this.body, this.sentinel);
-    this.view.append(this.chips, this.head, this.scroll);
+    this.view.append(this.toolbar, this.head, this.scroll);
     container.appendChild(this.view);
 
     // Append the next chunk before the sentinel is actually reached, so the
@@ -124,10 +120,9 @@ export class ListComponent {
     this.state = state;
 
     const filterKey = JSON.stringify(state.filters);
-    const chipKey = `${filterKey}|${state.listSort}`;
-    if (chipKey !== this.lastFilterKey) {
-      this.lastFilterKey = chipKey;
-      this.renderChips(state);
+    if (state.listSort !== this.lastSort) {
+      this.lastSort = state.listSort;
+      this.renderSort(state);
     }
 
     const dataKey = `${filterKey}|${state.query}|${state.listSort}`;
@@ -331,51 +326,13 @@ export class ListComponent {
     return row;
   }
 
-  /** Chips for the two facets a list reader actually wants to narrow by. */
-  private renderChips(state: AppState): void {
-    this.chips.innerHTML = "";
-    this.chips.append(
-      this.sortGroup(state),
-      this.chipGroup(
-        "Suomi / EU",
-        JURISDICTIONS,
-        "jurisdictions",
-        state,
-        (v) => JURISDICTION_LABELS[v as Jurisdiction],
-        (v) => colorForCategory("jurisdiction", v),
-      ),
-      this.chipGroup(
-        "Oikeudenala",
-        DOMAINS,
-        "domains",
-        state,
-        (v) => DOMAIN_LABELS[v as Domain],
-        (v) => colorForCategory("domain", v),
-      ),
-    );
-
-    if (state.filters.domains.length || state.filters.jurisdictions.length) {
-      const clear = document.createElement("button");
-      clear.type = "button";
-      clear.className = "list-chip list-clear";
-      clear.textContent = "Tyhjennä";
-      clear.addEventListener("click", () =>
-        this.onFilterChange({
-          ...state.filters,
-          domains: [],
-          jurisdictions: [],
-        }),
-      );
-      this.chips.appendChild(clear);
-    }
-  }
-
   /** Order-by control: which date the list sorts, groups and shows. */
-  private sortGroup(state: AppState): HTMLElement {
+  private renderSort(state: AppState): void {
+    this.toolbar.innerHTML = "";
     const group = document.createElement("div");
-    group.className = "list-filter-group";
+    group.className = "list-toolbar-group";
     const caption = document.createElement("span");
-    caption.className = "list-filter-label";
+    caption.className = "list-toolbar-label";
     caption.textContent = "Järjestys";
     group.appendChild(caption);
 
@@ -391,50 +348,6 @@ export class ListComponent {
       seg.appendChild(btn);
     }
     group.appendChild(seg);
-    return group;
-  }
-
-  private chipGroup(
-    label: string,
-    values: readonly string[],
-    facet: "domains" | "jurisdictions",
-    state: AppState,
-    labelOf: (v: string) => string,
-    colorOf: (v: string) => string,
-  ): HTMLElement {
-    const active = state.filters[facet] as readonly string[];
-    const group = document.createElement("div");
-    group.className = "list-filter-group";
-    const caption = document.createElement("span");
-    caption.className = "list-filter-label";
-    caption.textContent = label;
-    group.appendChild(caption);
-
-    for (const value of values) {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "list-chip";
-      // Empty facet = show all, so nothing is dimmed until one is picked.
-      if (active.includes(value)) chip.classList.add("on");
-      else if (active.length) chip.classList.add("inactive");
-
-      const sw = document.createElement("span");
-      sw.className = "list-chip-swatch";
-      sw.style.background = colorOf(value);
-      chip.append(sw, document.createTextNode(labelOf(value)));
-
-      chip.addEventListener("click", () => {
-        const next = active.includes(value)
-          ? active.filter((v) => v !== value)
-          : [...active, value];
-        this.onFilterChange(
-          facet === "domains"
-            ? { ...state.filters, domains: next as Domain[] }
-            : { ...state.filters, jurisdictions: next as Jurisdiction[] },
-        );
-      });
-      group.appendChild(chip);
-    }
-    return group;
+    this.toolbar.appendChild(group);
   }
 }

@@ -351,6 +351,50 @@ body {
 .feed-link:hover {
   color: var(--accent);
 }
+/* List view: the panel carries every facet, so groups need separating and
+   the panel itself may outgrow the dock. */
+.legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-bottom: 3px;
+}
+.legend-group + .legend-group {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 11px;
+}
+.legend-group-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+.legend-clear {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: var(--accent);
+  cursor: pointer;
+}
+.legend-clear:hover {
+  text-decoration: underline;
+}
+body.view-list .legend-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+body.view-list .legend-panel::-webkit-scrollbar {
+  width: 8px;
+}
+body.view-list .legend-panel::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
 .legend-title {
   font-size: 0.66rem;
   text-transform: uppercase;
@@ -547,66 +591,26 @@ body {
      (which the hidden timeline bar no longer leaves room for) off the rows. */
   padding: 2px 2px 42px 24px;
 }
-.list-filters {
+.list-toolbar {
   flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 14px;
 }
-.list-filter-group {
+.list-toolbar-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
-.list-filter-label {
+.list-toolbar-label {
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--faint);
 }
-.list-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 11px 4px 9px;
-  color: var(--muted);
-  font-family: inherit;
-  font-size: 0.72rem;
-  line-height: 1.3;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    opacity 0.15s;
-}
-.list-chip:hover {
-  color: var(--ink);
-  border-color: var(--faint);
-}
-.list-chip.on {
-  background: linear-gradient(180deg, #2a3a78, #1f2c5c);
-  border-color: #3a4c94;
-  color: #fff;
-}
-.list-chip.inactive {
-  opacity: 0.42;
-}
-.list-clear {
-  padding: 4px 12px;
-  color: var(--accent);
-}
-.list-chip-swatch {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-/* The shared segmented control, sized to sit in the filter row. */
+/* The shared segmented control, sized to sit in the list toolbar. */
 .segmented.list-sort button {
   padding: 4px 12px;
   font-size: 0.72rem;

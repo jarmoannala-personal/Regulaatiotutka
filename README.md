@@ -18,10 +18,12 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   legal relationships (amends / repeals / based-on, ~1000 edges) with
   wheel/trackpad-pinch zoom and drag-pan; self-degrades to an empty note
   when filtered too sparse.
-- **Lista (list)** — every match newest-first, with month dividers and
-  heavier sticky year dividers, an FI/EU badge per row, its own domain /
-  FI–EU filter chips and incremental rendering (200 rows per chunk, extended
-  on scroll — no pagination). *Järjestys* switches between the date given
+- **Lista (list)** — every match newest-first, with month dividers, heavier
+  sticky year dividers, an FI/EU badge per row and incremental rendering
+  (200 rows per chunk, extended on scroll — no pagination). Filtering lives
+  in the dock, which in this view lists **every** facet (domain, FI/EU,
+  impact) rather than only the sector dimension, so the list's own toolbar
+  carries nothing but the sort control. *Järjestys* switches between the date given
   (**Annettu**, the date the rest of the app uses) and the date it takes
   effect (**Voimaan**), which floats not-yet-in-force law to the top and
   collects open-ended commencements in a trailing group. The one view that
@@ -29,8 +31,9 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   bar and the dock feed hide while it is open.
 
 Hover any item for a summary, click for the official source. A right-hand
-dock holds a free-text search, the legend (click to filter), and a
-timeline-following feed of the legislation as it appears. The search has a
+dock holds a free-text search, the legend (click to filter — every facet at
+once in Lista, the sector dimension elsewhere), and a timeline-following feed
+of the legislation as it appears. The search has a
 hand-curated EN/acronym↔Finnish + CELEX alias map, so "gdpr", "ai act" or
 "tax" hit the Finnish corpus.
 

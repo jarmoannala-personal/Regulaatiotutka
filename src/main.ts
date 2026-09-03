@@ -100,7 +100,6 @@ async function boot(): Promise<void> {
   const list = new ListComponent(
     listHost,
     (e: RegulationEvent) => store.set({ selectedEventId: e.id }),
-    (filters) => store.set({ filters }),
     (listSort) => store.set({ listSort }),
   );
 
