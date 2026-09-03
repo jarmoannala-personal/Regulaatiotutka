@@ -3,8 +3,8 @@ import { KEEP_FROM_YEAR, MAX_EVENTS } from "./config.js";
 
 /**
  * Merge event lists, keyed by `id`. Earlier lists win over later ones, so call
- * as `dedupeEvents(liveEvents, seedEvents)` — live pipeline data overrides the
- * committed seed for the same id.
+ * as `dedupeEvents(liveEvents, ...)` — a consolidated statute beats the same
+ * act seen in the säädöskokoelma crawl, whose metadata is thinner.
  */
 export function dedupeEvents(
   ...lists: RegulationEvent[][]
@@ -16,6 +16,52 @@ export function dedupeEvents(
     }
   }
   return [...byId.values()];
+}
+
+/**
+ * Fold the curated seed into the live events, keyed by `id`.
+ *
+ * The seed is the source of truth, so a curated act keeps **every field it
+ * states** — its hand-written summary, its deliberate impact tier, domain and
+ * title — and the live record only fills in what the seed leaves empty
+ * (typically `amendedSections` and `eli`). The previous merge let live data
+ * win the whole record, which silently replaced 46 of the 78 hand-written
+ * summaries with the statute's own title every time a crawl happened to
+ * return the same act: the pipeline cannot write a summary, only a human can,
+ * so live data must never overwrite one.
+ *
+ * Acts the seed does not mention are passed through untouched.
+ */
+export function mergeSeed(
+  live: RegulationEvent[],
+  seed: RegulationEvent[],
+): RegulationEvent[] {
+  const curated = new Map(seed.map((ev) => [ev.id, ev]));
+  const out: RegulationEvent[] = [];
+  const used = new Set<string>();
+
+  for (const ev of live) {
+    const seedEv = curated.get(ev.id);
+    if (!seedEv) {
+      out.push(ev);
+      continue;
+    }
+    used.add(ev.id);
+    // Start from live (so its extra fields survive), then let every value the
+    // seed actually states win.
+    const merged = { ...ev } as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(seedEv)) {
+      if (value === null || value === undefined) continue;
+      if (Array.isArray(value) && value.length === 0) continue;
+      merged[key] = value;
+    }
+    out.push(merged as unknown as RegulationEvent);
+  }
+
+  for (const ev of seed) {
+    if (!used.has(ev.id)) out.push(ev);
+  }
+  return out;
 }
 
 /**

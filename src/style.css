@@ -763,6 +763,12 @@ body.view-list .legend-panel::-webkit-scrollbar-thumb {
   height: 1px;
 }
 
+/* Only the curated seed has written summaries; the rest say so plainly. */
+.detail-nosummary {
+  color: var(--faint);
+  font-style: italic;
+}
+
 /* ---- Bottom timeline bar ---- */
 .timeline-bar {
   position: absolute;

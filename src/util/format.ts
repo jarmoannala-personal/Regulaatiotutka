@@ -21,6 +21,30 @@ export function yearOf(iso: string): number {
   return Number(iso.slice(0, 4));
 }
 
+/**
+ * Whether an event's `summary` says anything its title does not.
+ *
+ * Only the curated seed carries written summaries; for a crawled act the
+ * pipeline can do no better than repeat the title (`summary: shorten(title)`),
+ * which is ~97 % of the dataset. Showing that as a summary just prints the
+ * heading twice and implies a description exists, so the UI asks first.
+ *
+ * The two are compared as prefixes **both ways**: the title is truncated at
+ * 200 characters and the summary at 280, so for a long-titled act the echo is
+ * the *longer* string of the two.
+ */
+export function hasSummary(event: {
+  title: string;
+  summary: string;
+}): boolean {
+  const norm = (t: string) =>
+    t.replace(/[…\s]+$/, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const title = norm(event.title);
+  const summary = norm(event.summary);
+  if (summary === "") return false;
+  return !title.startsWith(summary) && !summary.startsWith(title);
+}
+
 /** Finnish label for a category value within a dimension. */
 export function categoryLabel(
   dim: CategoryDimension,

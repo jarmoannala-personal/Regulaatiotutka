@@ -5,7 +5,7 @@ import {
   INSTRUMENT_LABELS,
   JURISDICTION_LABELS,
 } from "../../shared/schema";
-import { formatDate } from "../util/format";
+import { formatDate, hasSummary } from "../util/format";
 
 function row(term: string, value: string): string {
   return `<dt>${term}</dt><dd>${value}</dd>`;
@@ -26,7 +26,12 @@ export function renderDetailPanel(
   el.innerHTML = `
     <button class="close" aria-label="Sulje">×</button>
     <h2>${event.title}</h2>
-    <p>${event.summary}</p>
+    ${
+      hasSummary(event)
+        ? `<p>${event.summary}</p>`
+        : '<p class="detail-nosummary">Tiivistelmää ei ole – ' +
+          'säädöksen sisältö virallisessa lähteessä.</p>'
+    }
     <dl>
       ${row("Lainkäyttö", JURISDICTION_LABELS[event.jurisdiction])}
       ${row("Oikeudenala", DOMAIN_LABELS[event.domain])}

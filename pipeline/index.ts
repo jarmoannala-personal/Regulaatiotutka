@@ -3,7 +3,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { RegulationEvent } from "../shared/schema.js";
 import { FINLEX_COOLDOWN_MS, FROM_YEAR, SEED_PATH, TO_YEAR } from "./config.js";
-import { capEvents, dedupeEvents, withinCoverage } from "./dedupe.js";
+import {
+  capEvents,
+  dedupeEvents,
+  mergeSeed,
+  withinCoverage,
+} from "./dedupe.js";
 import { fetchEurLex } from "./sources/eurlex.js";
 import { fetchEurLexEdges } from "./sources/eurlexEdges.js";
 import { fetchFinlex, fetchFinlexAmendments } from "./sources/finlex.js";
@@ -51,14 +56,31 @@ async function main(): Promise<void> {
 
   // Consolidated first: for a statute present in both sets its metadata is
   // richer (entry into force, ELI), and dedupe keeps the first id it sees.
-  const live = [...finlex, ...amendments, ...eurlex];
-  // Seed is always merged for baseline coverage; live data wins on id clashes,
-  // and seed ids are never dropped by the size cap.
+  const live = dedupeEvents(...[finlex, amendments, eurlex]);
+  // The seed is always merged for baseline coverage, and it is the source of
+  // truth on the acts it curates: `mergeSeed` keeps its summary, impact tier,
+  // domain and title while taking the live record's extra metadata. Seed ids
+  // are also never dropped by the size cap.
   const seedIds = new Set(seed.map((e) => e.id));
   const merged = capEvents(
-    withinCoverage(dedupeEvents(live, seed), FROM_YEAR, TO_YEAR),
+    withinCoverage(mergeSeed(live, seed), FROM_YEAR, TO_YEAR),
     seedIds,
   );
+
+  // The curated summaries are the only written prose in the dataset, and a
+  // crawl must never be able to overwrite one again unnoticed.
+  const summariesById = new Map(merged.map((e) => [e.id, e.summary]));
+  const lostSummaries = seed.filter(
+    (e) => summariesById.get(e.id) !== e.summary,
+  );
+  if (lostSummaries.length > 0) {
+    console.warn(
+      `[pipeline] curated summaries lost: ${lostSummaries.length}/` +
+        `${seed.length} (${lostSummaries.map((e) => e.id).join(", ")})`,
+    );
+  } else {
+    console.log(`[pipeline] curated summaries kept: ${seed.length}/${seed.length}`);
+  }
 
   const origin = live.length > 0 ? "pipeline" : "seed-fallback";
   const sourceVersion = [

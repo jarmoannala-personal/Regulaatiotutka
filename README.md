@@ -30,7 +30,10 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   ignores the timeline cursor: it browses the whole corpus, so the timeline
   bar and the dock feed hide while it is open.
 
-Hover any item for a summary, click for the official source. A right-hand
+Hover any item for its details, click for the official source. Written
+summaries exist only for the 78 curated seed acts — a crawled statute has no
+description in either source API, so the app says so rather than echoing the
+title. A right-hand
 dock holds a free-text search, the legend (click to filter — every facet at
 once in Lista, the sector dimension elsewhere), and a timeline-following feed
 of the legislation as it appears. The search has a

@@ -46,9 +46,24 @@ and the three views). Vite + TypeScript + D3, no UI framework.
   it, and never treat it as a record of anything — every build overwrites it.
 - `shared/schema.ts` is the single contract shared by pipeline and frontend.
   Changing it means changing both sides.
-- Live data wins over the seed on id clashes (`dedupeEvents(live, seed)`), and
-  seed ids are exempt from the `MAX_EVENTS` cap (`capEvents(..., seedIds)`), so
-  a growing live result set can never push a curated landmark off the radar.
+- **The seed wins field-by-field on id clashes** (`mergeSeed(live, seed)`):
+  every value the seed states — summary, impact tier, domain, title — survives
+  a crawl of the same act, and the live record only fills in what the seed
+  leaves empty (`amendedSections`, `eli`). Until 2026-09-03 the merge was the
+  other way round (`dedupeEvents(live, seed)`, live wins the whole record),
+  which silently replaced **46 of the 78 hand-written summaries** with the
+  statute's own title on every build. A crawl can never write a summary, so it
+  must never overwrite one. The pipeline logs
+  `curated summaries kept: 78/78` and warns if any are lost.
+- Seed ids are also exempt from the `MAX_EVENTS` cap
+  (`capEvents(..., seedIds)`), so a growing live result set can never push a
+  curated landmark off the radar.
+- **Only the seed has real summaries.** For crawled acts the pipeline sets
+  `summary: shorten(title)` — the title again — so ~97 % of the dataset has no
+  description. `hasSummary()` in `src/util/format.ts` is what the UI asks
+  before printing one; the detail panel and radar tooltip show an honest note
+  instead of the heading twice. Writing real summaries for live law needs the
+  statute text, not a metadata field (see `IDEAS.md`).
 
 ### Editing the seed — verification is mandatory
 

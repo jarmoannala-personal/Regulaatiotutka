@@ -2,7 +2,7 @@ import { easeCubicOut, type Selection } from "d3";
 import type { RegulationEvent } from "../../shared/schema";
 import type { AppState } from "../state/appState";
 import { colorForEvent } from "../util/colors";
-import { formatDate } from "../util/format";
+import { formatDate, hasSummary } from "../util/format";
 import { isFiltered, matchesQuery } from "../util/match";
 import type { RadarGeometry } from "./geometry";
 
@@ -51,7 +51,7 @@ export function renderBlips(
           .style("opacity", 0)
           .on("mouseenter", (_e, d) => {
             tip.innerHTML =
-              `<strong>${d.title}</strong>${d.summary}` +
+              `<strong>${d.title}</strong>${hasSummary(d) ? d.summary : ""}` +
               `<div class="meta">${formatDate(d.dateAnnounced)} · ${d.jurisdiction}</div>`;
             tip.classList.add("visible");
           })
