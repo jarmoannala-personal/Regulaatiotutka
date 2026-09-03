@@ -504,6 +504,16 @@ body.view-list .legend-panel::-webkit-scrollbar-thumb {
   margin-bottom: 4px;
   color: #fff;
 }
+.radar-tooltip .tip-summary {
+  color: var(--muted);
+  /* A tooltip is a glance, not a read: three lines of the excerpt, then the
+     detail panel carries the rest. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
 .radar-tooltip .meta {
   color: var(--muted);
   margin-top: 5px;
@@ -763,10 +773,26 @@ body.view-list .legend-panel::-webkit-scrollbar-thumb {
   height: 1px;
 }
 
-/* Only the curated seed has written summaries; the rest say so plainly. */
+/* Acts with no text at all (EU acts, FI notices) say so plainly. */
 .detail-nosummary {
   color: var(--faint);
   font-style: italic;
+}
+
+/* An excerpt is the statute's own wording, not our description of it, so it
+   is set as a quote and the provision it comes from is named under it. */
+.detail-excerpt {
+  margin: 0 0 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.detail-excerpt-src {
+  margin: 0 0 14px;
+  font-size: 0.72rem;
+  color: var(--faint);
 }
 
 /* ---- Bottom timeline bar ---- */

@@ -22,27 +22,44 @@ export function yearOf(iso: string): number {
 }
 
 /**
- * Whether an event's `summary` says anything its title does not.
+ * Whether an event has text worth showing under its title.
  *
- * Only the curated seed carries written summaries; for a crawled act the
- * pipeline can do no better than repeat the title (`summary: shorten(title)`),
- * which is ~97 % of the dataset. Showing that as a summary just prints the
- * heading twice and implies a description exists, so the UI asks first.
- *
- * The two are compared as prefixes **both ways**: the title is truncated at
- * 200 characters and the summary at 280, so for a long-titled act the echo is
- * the *longer* string of the two.
+ * Since 2026-09-03 the pipeline says so itself: `summarySource` is `curated`
+ * for the seed's hand-written prose and `excerpt` for a verbatim quote of the
+ * statute's own opening provision, and an event with neither carries
+ * `summary: ""`. The prefix comparison below is the fallback for a dataset
+ * published before that — builds no longer re-crawl, so a live dataset can be
+ * a month older than this code, and back then a crawled act's summary was its
+ * title again (capped at 280 chars against the title's 200, so the echo can be
+ * the longer string of the two).
  */
 export function hasSummary(event: {
   title: string;
   summary: string;
+  summarySource?: string;
 }): boolean {
+  if (event.summary.trim() === "") return false;
+  if (event.summarySource) return true;
   const norm = (t: string) =>
     t.replace(/[…\s]+$/, "").replace(/\s+/g, " ").trim().toLowerCase();
   const title = norm(event.title);
   const summary = norm(event.summary);
-  if (summary === "") return false;
   return !title.startsWith(summary) && !summary.startsWith(title);
+}
+
+/**
+ * Escape text for interpolation into an `innerHTML` template.
+ *
+ * Titles and curated summaries are Finlex/EUR-Lex metadata, but an excerpt is
+ * raw statute prose — "<" and "&" occur in it — and both the detail panel and
+ * the radar tooltip build their markup as strings.
+ */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /** Finnish label for a category value within a dimension. */

@@ -61,7 +61,10 @@ export function normalizeEurLex(row: EurLexRow): RegulationEvent | null {
     dateAnnounced: row.docDate,
     dateInForce: plausibleDate(row.inForce),
     sourceUrl: `https://eur-lex.europa.eu/legal-content/FI/TXT/?uri=CELEX:${row.celex}`,
-    summary: shorten(title),
+    // CELLAR publishes no abstract and the act's own text is a separate
+    // multi-megabyte document, so an EU act arrives with nothing to say beyond
+    // its title. Empty, not the title again: the UI says so honestly.
+    summary: "",
     instrumentType,
     celex: row.celex,
     domainConfidence: domainFromEurovoc(row.eurovocIds) ? "tagged" : "keyword",
@@ -78,6 +81,8 @@ export interface FinlexItem {
   eli?: string;
   /** Finlex typeStatute refersTo, stripped of '#': "act" | "decree" | … */
   statuteType?: string;
+  /** Verbatim quote of the statute's opening provision, from its own text. */
+  excerpt?: { text: string; ref: string };
 }
 
 /** FI consolidated statute -> RegulationEvent, or null if out of scope. */
@@ -115,7 +120,17 @@ export function normalizeFinlex(item: FinlexItem): RegulationEvent | null {
     dateAnnounced: item.dateIssued,
     dateInForce: plausibleDate(item.dateInForce),
     sourceUrl: `https://www.finlex.fi/fi/${path}`,
-    summary: shorten(title),
+    // The crawl cannot write a summary, but the statute can: `excerpt` is the
+    // act's own opening provision, quoted verbatim from the Finlex text the
+    // search endpoint already returns. Acts whose document carries no usable
+    // section (notices, treaty acts) get nothing rather than their title back.
+    summary: item.excerpt ? shorten(item.excerpt.text) : "",
+    ...(item.excerpt
+      ? {
+          summarySource: "excerpt" as const,
+          ...(item.excerpt.ref ? { summaryRef: item.excerpt.ref } : {}),
+        }
+      : {}),
     instrumentType,
     statuteNumber: item.statuteNumber,
     ...(item.eli ? { eli: item.eli } : {}),

@@ -55,11 +55,16 @@ export function mergeSeed(
       if (Array.isArray(value) && value.length === 0) continue;
       merged[key] = value;
     }
+    // The seed's summary displaces the crawl's excerpt, so the excerpt's
+    // provenance must go with it — otherwise curated prose would be labelled
+    // as a quote of whichever section the live record happened to carry.
+    merged.summarySource = "curated";
+    delete merged.summaryRef;
     out.push(merged as unknown as RegulationEvent);
   }
 
   for (const ev of seed) {
-    if (!used.has(ev.id)) out.push(ev);
+    if (!used.has(ev.id)) out.push({ ...ev, summarySource: "curated" });
   }
   return out;
 }

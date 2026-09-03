@@ -82,6 +82,16 @@ async function main(): Promise<void> {
     console.log(`[pipeline] curated summaries kept: ${seed.length}/${seed.length}`);
   }
 
+  // What share of the dataset now says something. `excerpt` is the statute's
+  // own opening provision, quoted; the rest (EU acts, and FI documents with no
+  // usable section) carry no text at all and the UI states that plainly.
+  const curated = merged.filter((e) => e.summarySource === "curated").length;
+  const excerpts = merged.filter((e) => e.summarySource === "excerpt").length;
+  console.log(
+    `[pipeline] summaries: ${curated + excerpts}/${merged.length} ` +
+      `(${curated} curated, ${excerpts} sourced excerpts)`,
+  );
+
   const origin = live.length > 0 ? "pipeline" : "seed-fallback";
   const sourceVersion = [
     finlex.length ? "finlex-rest-v1" : null,

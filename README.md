@@ -30,10 +30,12 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   ignores the timeline cursor: it browses the whole corpus, so the timeline
   bar and the dock feed hide while it is open.
 
-Hover any item for its details, click for the official source. Written
-summaries exist only for the 78 curated seed acts — a crawled statute has no
-description in either source API, so the app says so rather than echoing the
-title. A right-hand
+Hover any item for its details, click for the official source. The text under
+a heading is one of two things, and the app always says which: hand-written
+prose for the 78 curated acts, or a **verbatim quote of the statute's own
+opening provision** ("Ote säädöstekstistä, 1 § Lain tarkoitus") for a crawled
+Finnish act. Nothing is ever generated. EU acts have neither — CELLAR
+publishes no abstract — and the app says so rather than echoing the title. A right-hand
 dock holds a free-text search, the legend (click to filter — every facet at
 once in Lista, the sector dimension elsewhere), and a timeline-following feed
 of the legislation as it appears. The search has a

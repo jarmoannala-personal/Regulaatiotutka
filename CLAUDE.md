@@ -58,12 +58,24 @@ and the three views). Vite + TypeScript + D3, no UI framework.
 - Seed ids are also exempt from the `MAX_EVENTS` cap
   (`capEvents(..., seedIds)`), so a growing live result set can never push a
   curated landmark off the radar.
-- **Only the seed has real summaries.** For crawled acts the pipeline sets
-  `summary: shorten(title)` — the title again — so ~97 % of the dataset has no
-  description. `hasSummary()` in `src/util/format.ts` is what the UI asks
-  before printing one; the detail panel and radar tooltip show an honest note
-  instead of the heading twice. Writing real summaries for live law needs the
-  statute text, not a metadata field (see `IDEAS.md`).
+- **Three kinds of summary, and `summarySource` says which.** `curated` is the
+  seed's hand-written prose. `excerpt` is a **verbatim quote of the statute's
+  own opening provision** (usually "1 § Lain tarkoitus" / "Soveltamisala"),
+  lifted from the Finlex document the crawl already downloads — real text the
+  pipeline cannot get wrong because it did not write it. Neither means
+  `summary: ""`: EU acts (CELLAR publishes no abstract) and FI documents with
+  no usable section. The UI renders an excerpt as a blockquote labelled "Ote
+  säädöstekstistä, 1 § …", curated prose as a plain paragraph, and nothing as
+  a plain note — never the title twice. `hasSummary()` in `src/util/format.ts`
+  is what asks; it trusts `summarySource` and falls back to the old
+  title-vs-summary prefix comparison for a dataset published before
+  2026-09-03. See `decisions/2026-09-03-statute-excerpts-as-summaries.md`.
+- **Excerpts need the order-preserving parse.** `extractExcerpts()` in
+  `sources/finlex.ts` re-parses each result page with `preserveOrder: true`,
+  because the default `fast-xml-parser` config groups children by tag name and
+  so lifts inline `<ref>` citations out of their sentence ("passilain1
+  momentissa" for "passilain (671/2006) 1 momentissa"). Never quote statute
+  text from the other parse.
 
 ### Editing the seed — verification is mandatory
 
@@ -139,9 +151,9 @@ Conventions for new entries:
 - Amendment metadata is parsed, not given: the säädöskokoelma carries no
   `inForce` field, so `dateInForce` comes from the statute's own closing
   formula ("Tämä laki tulee voimaan 1 päivänä tammikuuta 2026") and
-  `amendedSections` from the title. Both parsers are exported from
-  `sources/finlex.ts` and are the right place to add a regression test if they
-  ever misfire.
+  `amendedSections` from the title. Both parsers — and `pickExcerpt` /
+  `extractExcerpts` — are exported from `sources/finlex.ts` and are the right
+  place to add a regression test if they ever misfire.
 - The pipeline **always exits 0**. A data-source outage must never fail the
   build — it degrades to `origin: "seed-fallback"` and the UI shows a banner.
 - `pipeline/normalize/domainMap.ts` is what decides whether a live law appears

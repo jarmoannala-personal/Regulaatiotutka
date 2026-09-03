@@ -31,6 +31,173 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
+/**
+ * Second parser, order-preserving, used only to lift excerpt text.
+ *
+ * The default parse groups children by tag name, which destroys the order of
+ * mixed content: an inline `<ref>` citation is hoisted out of the sentence it
+ * sits in ("passilain1 momentissa säädetään" instead of "passilain (671/2006)
+ * 1 momentissa säädetään"). Statute prose is only quotable if its word order
+ * survives, so excerpts are read from this parse and everything else from the
+ * cheaper one above.
+ */
+const orderedParser = new XMLParser({
+  preserveOrder: true,
+  ignoreAttributes: true,
+  removeNSPrefix: true,
+  trimValues: false,
+});
+
+/** A node of the order-preserving parse: `{ tag: children[] }` or `{ "#text" }`. */
+type OrderedNode = Record<string, unknown>;
+
+const tagOf = (n: OrderedNode): string =>
+  Object.keys(n).find((k) => k !== ":@") ?? "";
+
+const childrenOf = (n: OrderedNode, tag = tagOf(n)): OrderedNode[] =>
+  (Array.isArray(n[tag]) ? n[tag] : []) as OrderedNode[];
+
+const clean = (s: string): string => s.replace(/\s+/g, " ").trim();
+
+/** Concatenate the text leaves of an ordered subtree in document order. */
+function orderedText(
+  nodes: OrderedNode[],
+  out: string[] = [],
+  depth = 0,
+): string {
+  if (depth > 30) return out.join("");
+  for (const n of nodes) {
+    const tag = tagOf(n);
+    if (tag === "#text") {
+      out.push(String(n["#text"]));
+      continue;
+    }
+    orderedText(childrenOf(n, tag), out, depth + 1);
+    // Block-level siblings carry no whitespace of their own.
+    if (tag === "p" || tag === "subsection" || tag === "paragraph") {
+      out.push(" ");
+    }
+  }
+  return out.join("");
+}
+
+/** Every descendant element of an ordered subtree, in document order. */
+function* descend(
+  nodes: OrderedNode[],
+  depth = 0,
+): Generator<[string, OrderedNode]> {
+  if (depth > 25) return;
+  for (const n of nodes) {
+    const tag = tagOf(n);
+    if (!tag || tag === "#text" || !Array.isArray(n[tag])) continue;
+    yield [tag, n];
+    yield* descend(childrenOf(n, tag), depth + 1);
+  }
+}
+
+/** A verbatim quote of one provision of a statute — never generated text. */
+export interface StatuteExcerpt {
+  /** The provision's own words, whitespace-normalized, otherwise unedited. */
+  text: string;
+  /** Which provision it is, e.g. "1 § Lain tarkoitus". */
+  ref: string;
+}
+
+/** Sections that describe the act's own lifecycle, not what it regulates. */
+const EXCERPT_SKIP = /voimaantulo|siirtymä|kumoa|muutoksenhaku/i;
+/** Headings that state what the act is for — the closest thing to a summary. */
+const EXCERPT_PREFER = /tarkoitus|soveltamisala|soveltaminen|tavoite|kohde/i;
+/** Below this a "section" is a stub or a cross-reference, not a description. */
+const EXCERPT_MIN_CHARS = 40;
+/** How deep into an act to look before giving up on a usable opening. */
+const EXCERPT_SCAN = 8;
+
+interface RawSection {
+  num: string;
+  heading: string;
+  text: string;
+}
+
+/**
+ * Choose the provision that best describes the act: a purpose/scope section
+ * within the first {@link EXCERPT_SCAN}, else the first substantive one.
+ * Commencement and repeal sections are skipped — they say when the act starts,
+ * not what it does.
+ */
+export function pickExcerpt(sections: RawSection[]): StatuteExcerpt | undefined {
+  const usable = sections
+    .slice(0, EXCERPT_SCAN)
+    .filter(
+      (s) =>
+        s.text.length >= EXCERPT_MIN_CHARS &&
+        !EXCERPT_SKIP.test(s.heading) &&
+        !/^tämä (laki|asetus|päätös) tulee voimaan/i.test(s.text),
+    );
+  const pick =
+    usable.find((s) => EXCERPT_PREFER.test(s.heading)) ?? usable[0];
+  if (!pick) return undefined;
+  return { text: pick.text, ref: `${pick.num} ${pick.heading}`.trim() };
+}
+
+/**
+ * Map every statute on a result page to a quote of its opening provision.
+ *
+ * Keyed by säädösnumero ("18/2026") so the caller can attach it to the item it
+ * already parsed. The säädöskokoelma serves each statute twice; the first hit
+ * wins, as everywhere else in this file.
+ */
+export function extractExcerpts(xml: string): Map<string, StatuteExcerpt> {
+  const out = new Map<string, StatuteExcerpt>();
+  let root: OrderedNode[];
+  try {
+    root = orderedParser.parse(xml) as OrderedNode[];
+  } catch {
+    return out; // excerpts are a bonus; never fail a crawl over them
+  }
+  const list = root.find((n) => tagOf(n) === "AknXmlList");
+  if (!list) return out;
+  const results = childrenOf(list).find((n) => tagOf(n) === "Results");
+  if (!results) return out;
+
+  for (const doc of childrenOf(results)) {
+    if (tagOf(doc) !== "akomaNtoso") continue;
+    const act = childrenOf(doc).find((n) =>
+      ["act", "doc", "bill"].includes(tagOf(n)),
+    );
+    if (!act) continue;
+    const parts = childrenOf(act);
+    const preface = parts.find((n) => tagOf(n) === "preface");
+    const body = parts.find((n) => tagOf(n) === "body");
+    if (!preface || !body) continue;
+
+    let statuteNumber = "";
+    for (const [tag, node] of descend(childrenOf(preface))) {
+      if (tag !== "docNumber") continue;
+      statuteNumber = clean(orderedText(childrenOf(node, tag)));
+      break;
+    }
+    if (!statuteNumber || out.has(statuteNumber)) continue;
+
+    const sections: RawSection[] = [];
+    for (const [tag, node] of descend(childrenOf(body))) {
+      if (tag !== "section" && tag !== "article") continue;
+      const kids = childrenOf(node, tag);
+      const numEl = kids.find((k) => tagOf(k) === "num");
+      const headEl = kids.find((k) => tagOf(k) === "heading");
+      const rest = kids.filter((k) => !["num", "heading"].includes(tagOf(k)));
+      sections.push({
+        num: numEl ? clean(orderedText(childrenOf(numEl))) : "",
+        heading: headEl ? clean(orderedText(childrenOf(headEl))) : "",
+        text: clean(orderedText(rest)),
+      });
+      if (sections.length >= EXCERPT_SCAN) break;
+    }
+    const excerpt = pickExcerpt(sections);
+    if (excerpt) out.set(statuteNumber, excerpt);
+  }
+  return out;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const asArray = <T>(v: T | T[] | undefined): T[] =>
   v == null ? [] : Array.isArray(v) ? v : [v];
@@ -195,11 +362,18 @@ function toAmendmentItem(node: Record<string, unknown>): FinlexItem | null {
   };
 }
 
+/** One page of results: the parsed statutes and a quote of each one's
+ *  opening provision, read from the same XML (see {@link extractExcerpts}). */
+interface FinlexPage {
+  nodes: Record<string, unknown>[];
+  excerpts: Map<string, StatuteExcerpt>;
+}
+
 async function fetchPage(
   searchUrl: string,
   year: number,
   page: number,
-): Promise<Record<string, unknown>[]> {
+): Promise<FinlexPage> {
   const url = new URL(searchUrl);
   url.searchParams.set("startYear", String(year));
   url.searchParams.set("endYear", String(year));
@@ -231,9 +405,12 @@ async function fetchPage(
       const parsed = parser.parse(xml) as {
         AknXmlList?: { Results?: { akomaNtoso?: unknown } };
       };
-      return asArray(
-        parsed.AknXmlList?.Results?.akomaNtoso,
-      ) as Record<string, unknown>[];
+      return {
+        nodes: asArray(
+          parsed.AknXmlList?.Results?.akomaNtoso,
+        ) as Record<string, unknown>[],
+        excerpts: extractExcerpts(xml),
+      };
     } finally {
       clearTimeout(timer);
     }
@@ -273,13 +450,14 @@ async function crawl(opts: CrawlOptions): Promise<RegulationEvent[]> {
     try {
       for (let page = 1; page <= opts.maxPagesPerYear; page++) {
         if (Date.now() > deadline) break;
-        const nodes = await fetchPage(opts.searchUrl, year, page);
+        const { nodes, excerpts } = await fetchPage(opts.searchUrl, year, page);
         if (nodes.length === 0) break;
         for (const n of nodes) {
           const item = opts.toItem(n);
           if (!item) continue;
-          const ev = normalizeFinlex(item); // null if out of scope
-          if (ev && !byId.has(ev.id)) byId.set(ev.id, ev);
+          const excerpt = excerpts.get(item.statuteNumber);
+          const ev = normalizeFinlex(excerpt ? { ...item, excerpt } : item);
+          if (ev && !byId.has(ev.id)) byId.set(ev.id, ev); // null = out of scope
         }
         if (nodes.length < FINLEX_PAGE_LIMIT) break;
         await sleep(FINLEX_SPACING_MS);

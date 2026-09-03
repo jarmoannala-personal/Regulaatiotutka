@@ -28,6 +28,23 @@ export type InstrumentType =
 
 export type DomainConfidence = "tagged" | "keyword";
 
+/**
+ * Where an event's {@link RegulationEvent.summary} comes from.
+ *
+ * - `curated` — hand-written prose from the committed seed. A human read the
+ *   act; this is the only text in the dataset that is a *summary* in the
+ *   ordinary sense.
+ * - `excerpt` — a verbatim quote of the statute's own opening provision
+ *   (usually "1 § Lain tarkoitus" / "Soveltamisala"), lifted from the Finlex
+ *   text the crawl already downloads. Sourced and unedited, never generated,
+ *   so the UI labels it as a quote and names the provision it quotes
+ *   ({@link RegulationEvent.summaryRef}).
+ *
+ * Absent means the event has no summary at all: `summary` is then `""` and the
+ * UI says so plainly rather than repeating the title.
+ */
+export type SummarySource = "curated" | "excerpt";
+
 export interface RegulationEvent {
   /** Stable id: `fi:${statuteNumber}` or `eu:${celex}`. */
   id: string;
@@ -42,8 +59,12 @@ export interface RegulationEvent {
   dateInForce: string | null;
   /** Deep link to the official Finlex / EUR-Lex page. */
   sourceUrl: string;
-  /** Plain-language summary, <= 280 chars. */
+  /** Plain-language summary or sourced excerpt, <= 280 chars; "" if none. */
   summary: string;
+  /** Provenance of `summary`; absent when there is none. */
+  summarySource?: SummarySource;
+  /** For an excerpt: the provision quoted, e.g. "1 § Lain tarkoitus". */
+  summaryRef?: string;
   instrumentType: InstrumentType;
   eli?: string;
   celex?: string;

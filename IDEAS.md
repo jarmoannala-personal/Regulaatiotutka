@@ -64,41 +64,55 @@ there). Whether Pages then stays as a mirror — it is currently load-bearing as
 the first mirror `ensure:data` reads, so dropping it means pointing that at
 idle.fi instead.
 
-## Real summaries for crawled law
+## Text for the EU half of the corpus
 
-**Context.** Only the 78 curated seed acts have a written summary. For
-everything the pipeline crawls, `summary: shorten(title)` — the title again —
-so ~97 % of the dataset has no description. Neither source API offers one:
-Finlex serves the statute text, EUR-Lex/CELLAR serves metadata plus the
-document, and neither publishes an abstract. Since 2026-09-03 the UI is honest
-about it (`hasSummary()`), which is a floor, not a fix.
+**Context.** Since 2026-09-03 every crawled Finnish act carries a verbatim
+excerpt of its own opening provision (see
+`decisions/2026-09-03-statute-excerpts-as-summaries.md`), and the 78 seed acts
+carry hand-written prose. The ~1000 EU acts still carry nothing: CELLAR serves
+metadata and the document, never an abstract, so `summary: ""` and the panel
+says so.
 
 **Options, cheapest first.**
 
 - **Show more of the metadata we already fetch.** EU acts arrive with matched
   EuroVoc concepts (`eurovocIds` in `pipeline/sources/eurlex.ts`) that are
-  currently reduced to a domain and thrown away. Storing the matched concepts
-  and rendering them as topic tags ("arvonlisävero · verotusmenettely") adds
-  real, sourced information for the ~1000 EU entries. Needs a `shared/schema.ts`
-  field, a committed id→Finnish-label table, and a data rebuild. No prose.
-- **Derive a sentence from structure, not meaning.** For FI amendments the
-  title already names the act and the pipeline parses `amendedSections` and the
-  commencement date, so a template can state "Muuttaa lakia X, kohdat 1:3 ja
-  5:2, voimaan 1.1.2026." True by construction, but it only restates fields the
-  panel shows separately — thin value.
+  currently reduced to a domain and thrown away; CELLAR also carries
+  `resource_legal_is_about_subject-matter` with Finnish `skos:prefLabel`s
+  ("Kuluttajansuoja", "Vapauden, turvallisuuden ja oikeuden alue"). Rendering
+  them as topic tags adds real, sourced information for every EU entry. Needs a
+  `shared/schema.ts` field and a committed id→label table. Not prose, but not
+  nothing.
+- **Quote Article 1 the way FI quotes 1 §.** Works today —
+  `curl -H 'Accept: application/xhtml+xml' -H 'Accept-Language: fin'
+  http://publications.europa.eu/resource/celex/32023R1114` returns the Finnish
+  text — but the documents are 0.6–1.7 MB each, so ~1000 of them is a gigabyte
+  per build. Would need a wall-clock/byte budget and newest-first ordering like
+  the Finlex crawls, covering a slice per build rather than the corpus.
+- **The official "Summaries of EU legislation".** CELLAR links them by
+  `summary_legislation_eu_summarizes_resource_legal`, and Finnish expressions
+  exist ("Yleinen tietosuoja-asetus (GDPR)"). Two problems: coverage is ~17 %
+  of our corpus (8 of 47 works sampled for 2018), and the manifestation URIs
+  404 on their content datastream, so the text would have to be scraped from
+  eur-lex.europa.eu. Highest quality per hit, lowest hit rate.
 - **Extend the curated seed.** Highest quality, does not scale: the seed exists
   for landmarks, and hand-writing 2400 summaries is not a maintenance path.
   Worth doing for the acts that matter most to the audience (say the top 150
-  by impact tier) and leaving the rest honestly empty.
-- **Generate summaries from the statute text (LLM).** The only option that
-  scales to the whole corpus, and the only one that can be *wrong*. This app
-  looks authoritative and its whole verification discipline exists because a
-  fabricated reference is worse than a missing one, so this needs: generation
-  from the fetched statute text only (never from the model's own knowledge), a
-  visible "koneluettu tiivistelmä" label, the source link next to it, and a
-  spot-check pass before publishing. Cost and build time also stop being
-  trivial at 2400 acts.
+  by impact tier).
+- **Generate summaries from the act text (LLM).** The only option that scales
+  to the whole corpus, and the only one that can be *wrong*. This app looks
+  authoritative and its verification discipline exists because a fabricated
+  reference is worse than a missing one, so this needs: generation from the
+  fetched text only (never from the model's own knowledge), a visible
+  "koneluettu tiivistelmä" label, the source link next to it, and a spot-check
+  pass before publishing. Cost and build time also stop being trivial at 1000+
+  acts.
 
-**Open question.** Whether the product wants a description for every act at
-all, or whether "what changed, when, in which area, link to the source" is the
-honest scope — with curated prose only where a human has actually read the act.
+**Also worth doing on the FI side.**
+
+- **Pick the excerpt better.** `pickExcerpt` prefers a purpose/scope heading
+  within the first eight sections and otherwise takes the first substantive
+  one, which for an act whose 1 § is an organisational detail is not the most
+  descriptive provision available.
+- **Show the excerpt in the list view.** The rows carry title + facets only;
+  a clamped first line of the excerpt would make browsing far more useful.
