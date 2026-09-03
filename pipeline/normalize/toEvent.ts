@@ -1,4 +1,5 @@
 import type { RegulationEvent } from "../../shared/schema.js";
+import { plausibleDate } from "../../shared/schema.js";
 import { computeImpactTier } from "./impact.js";
 import { domainFromEurovoc, domainFromTitle } from "./domainMap.js";
 
@@ -58,7 +59,7 @@ export function normalizeEurLex(row: EurLexRow): RegulationEvent | null {
     domain,
     impactTier: computeImpactTier(instrumentType, undefined, title, "eu"),
     dateAnnounced: row.docDate,
-    dateInForce: row.inForce ?? null,
+    dateInForce: plausibleDate(row.inForce),
     sourceUrl: `https://eur-lex.europa.eu/legal-content/FI/TXT/?uri=CELEX:${row.celex}`,
     summary: shorten(title),
     instrumentType,
@@ -112,7 +113,7 @@ export function normalizeFinlex(item: FinlexItem): RegulationEvent | null {
       impactKind,
     ),
     dateAnnounced: item.dateIssued,
-    dateInForce: item.dateInForce ?? null,
+    dateInForce: plausibleDate(item.dateInForce),
     sourceUrl: `https://www.finlex.fi/fi/${path}`,
     summary: shorten(title),
     instrumentType,

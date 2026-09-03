@@ -64,6 +64,24 @@ export interface RegulationEdge {
   type: EdgeType;
 }
 
+/**
+ * Entry-into-force dates arrive from two unreliable shapes: CELLAR uses
+ * `1001-01-01` as its "no date" placeholder for
+ * `resource_legal_date_entry-into-force`, and the Finnish commencement date is
+ * parsed out of a statute's closing prose. A date far outside the corpus
+ * therefore means *unknown*, not a real commencement.
+ *
+ * Shared so the pipeline drops it at the source **and** the frontend never
+ * renders a year-1001 group from an already-published dataset — a build no
+ * longer re-crawls, so old data outlives a pipeline fix by up to a month.
+ */
+export function plausibleDate(iso: string | null | undefined): string | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const year = Number(iso.slice(0, 4));
+  const thisYear = new Date().getUTCFullYear();
+  return year >= 1900 && year <= thisYear + 20 ? iso : null;
+}
+
 export const SCHEMA_VERSION = "v1" as const;
 
 export interface RegulationDataset {

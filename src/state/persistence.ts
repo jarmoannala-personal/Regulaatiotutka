@@ -57,6 +57,9 @@ export function loadPersisted(defaults: AppState): AppState {
   if (typeof parsed.timelinePosition === "number") {
     next.timelinePosition = parsed.timelinePosition;
   }
+  if (parsed.listSort === "announced" || parsed.listSort === "inForce") {
+    next.listSort = parsed.listSort;
+  }
   if (typeof parsed.filters === "object" && parsed.filters !== null) {
     const f = parsed.filters as Record<string, unknown>;
     next.filters = {

@@ -19,11 +19,14 @@ switch (legal domain / Finland vs EU / impact), legend filters and search:
   wheel/trackpad-pinch zoom and drag-pan; self-degrades to an empty note
   when filtered too sparse.
 - **Lista (list)** — every match newest-first, with month dividers and
-  heavier sticky year dividers, its own domain / FI–EU filter chips and
-  incremental rendering (200 rows per chunk, extended on scroll — no
-  pagination). The one view that ignores the timeline cursor: it browses
-  the whole corpus, so the timeline bar and the dock feed hide while it is
-  open.
+  heavier sticky year dividers, an FI/EU badge per row, its own domain /
+  FI–EU filter chips and incremental rendering (200 rows per chunk, extended
+  on scroll — no pagination). *Järjestys* switches between the date given
+  (**Annettu**, the date the rest of the app uses) and the date it takes
+  effect (**Voimaan**), which floats not-yet-in-force law to the top and
+  collects open-ended commencements in a trailing group. The one view that
+  ignores the timeline cursor: it browses the whole corpus, so the timeline
+  bar and the dock feed hide while it is open.
 
 Hover any item for a summary, click for the official source. A right-hand
 dock holds a free-text search, the legend (click to filter), and a

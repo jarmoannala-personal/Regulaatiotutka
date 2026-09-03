@@ -3,6 +3,7 @@ import {
   isDomain,
   isImpactTier,
   isJurisdiction,
+  plausibleDate,
   SCHEMA_VERSION,
 } from "../../shared/schema";
 
@@ -50,5 +51,11 @@ export async function loadDataset(): Promise<RegulationDataset> {
     throw new Error("Dataset events are missing or malformed");
   }
   if (!Array.isArray(d.edges)) d.edges = []; // edges are optional/experimental
+  // Placeholder in-force dates mean "unknown" (see `plausibleDate`). Scrubbed
+  // here as well as in the pipeline, because a dataset published before that
+  // fix stays live until the next scheduled crawl.
+  for (const e of d.events as RegulationEvent[]) {
+    e.dateInForce = plausibleDate(e.dateInForce);
+  }
   return data as RegulationDataset;
 }

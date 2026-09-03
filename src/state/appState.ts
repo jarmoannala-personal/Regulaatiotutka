@@ -13,6 +13,13 @@ export type PlaySpeed = 0.1 | 0.5 | 1 | 2 | 4;
 /** Main visualization: radar, trend chart, relationship graph or list. */
 export type ViewMode = "radar" | "trend" | "graph" | "list";
 
+/**
+ * Which date the list view orders (and groups) by: the date the act was given
+ * — the same date the timeline uses everywhere else — or the date it takes
+ * effect, which is what makes "what is coming" readable.
+ */
+export type ListSort = "announced" | "inForce";
+
 export interface AppState {
   /** Which main visualization is showing. Persisted. */
   view: ViewMode;
@@ -32,6 +39,8 @@ export interface AppState {
     jurisdictions: Jurisdiction[];
     impact: ImpactTier[];
   };
+  /** List view only: order by announcement or by entry into force. Persisted. */
+  listSort: ListSort;
   /** Transient: free-text search, ANDed with filters + time cursor. */
   query: string;
   /** Transient: blip open in the detail panel. */
@@ -46,6 +55,7 @@ export const PERSISTED_KEYS = [
   "speed",
   "timelinePosition",
   "filters",
+  "listSort",
 ] as const satisfies readonly (keyof AppState)[];
 
 export function defaultState(coverage: {
@@ -62,6 +72,7 @@ export function defaultState(coverage: {
     // appear over time.
     timelinePosition: Date.UTC(coverage.fromYear, 0, 1),
     filters: { domains: [], jurisdictions: [], impact: [] },
+    listSort: "announced",
     query: "",
     selectedEventId: null,
   };

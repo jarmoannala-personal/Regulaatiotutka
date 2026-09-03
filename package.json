@@ -1,9 +1,9 @@
 {
   "name": "regulaatiotutka",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
-  "description": "Regulation Radar \u2014 sweep-radar visualization of Finnish and EU legislative change",
+  "description": "Regulation Radar — sweep-radar visualization of Finnish and EU legislative change",
   "author": "Jarmo Annala <jarmo.annala@idle.fi>",
   "scripts": {
     "pipeline": "tsx pipeline/index.ts",
