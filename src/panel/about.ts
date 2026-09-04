@@ -1,6 +1,9 @@
+import type { RegulationDataset } from "../../shared/schema";
+import { openDocs } from "./docs";
+
 const REPO_URL = "https://github.com/jarmoannala-personal/Regulaatiotutka";
 
-function buildOverlay(): HTMLDivElement {
+function buildOverlay(dataset: RegulationDataset): HTMLDivElement {
   const overlay = document.createElement("div");
   overlay.className = "about-overlay";
   overlay.innerHTML = `
@@ -34,6 +37,9 @@ function buildOverlay(): HTMLDivElement {
         <li><strong>Siemendata</strong> — käsin koostetut keskeiset säädökset,
           offline-varalla.</li>
       </ul>
+      <button class="about-docs" type="button">
+        Ohje ja dokumentaatio — näkymät, tietolähteet ja rajoitukset →
+      </button>
       <p class="about-foot">
         Ei takeita tietojen oikeellisuudesta. Vaikutusarvio on heuristinen.
         Tarkista aina virallinen lähde.
@@ -47,6 +53,12 @@ function buildOverlay(): HTMLDivElement {
   overlay
     .querySelector(".about-close")!
     .addEventListener("click", close);
+  // The documentation takes over the screen, so the small card gets out of
+  // its way rather than stacking behind it.
+  overlay.querySelector(".about-docs")!.addEventListener("click", () => {
+    close();
+    openDocs(dataset);
+  });
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       close();
@@ -58,14 +70,17 @@ function buildOverlay(): HTMLDivElement {
 }
 
 /** Adds a "Tietoja" button to `container` that opens the About overlay. */
-export function setupAbout(container: HTMLElement): void {
+export function setupAbout(
+  container: HTMLElement,
+  dataset: RegulationDataset,
+): void {
   const btn = document.createElement("button");
   btn.className = "about-btn";
   btn.type = "button";
   btn.title = "Tietoja palvelusta";
   btn.textContent = "Tietoja";
   btn.addEventListener("click", () =>
-    document.body.appendChild(buildOverlay()),
+    document.body.appendChild(buildOverlay(dataset)),
   );
   container.appendChild(btn);
 }

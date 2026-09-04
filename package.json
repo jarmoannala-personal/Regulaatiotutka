@@ -1,6 +1,6 @@
 {
   "name": "regulaatiotutka",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "private": true,
   "type": "module",
   "description": "Regulation Radar — sweep-radar visualization of Finnish and EU legislative change",

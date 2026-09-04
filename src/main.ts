@@ -86,7 +86,7 @@ async function boot(): Promise<void> {
   const topbarControls =
     document.querySelector<HTMLElement>(".topbar-controls")!;
   setupDockToggle(topbarControls);
-  setupAbout(topbarControls);
+  setupAbout(topbarControls, dataset);
   enableDockResize(document.getElementById("rightdock")!);
   const search = setupSearch(document.getElementById("search")!, (q) =>
     store.set({ query: q }),

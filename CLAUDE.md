@@ -208,6 +208,23 @@ bounded range. The track spans the data's years, not the coverage years,
 because in-force dates run ahead. List-only: the other views keep the cursor.
 See `decisions/2026-09-04-list-date-scrubber.md`.
 
+## In-app documentation (Ohje ja dokumentaatio)
+
+`src/panel/docs.ts` is a full-screen Finnish documentation view, opened by a
+button inside the *Tietoja* card (`about.ts` now takes the dataset and hands it
+on). Two rules: **no factual number is written in the prose** — totals, the
+per-domain table, the per-year bars, the thinnest years, `generatedAt` and the
+human-readable `sourceVersion` are all computed from the loaded dataset at open
+time, so the page cannot drift from the data; and the *Rajoitukset* section
+names the real mechanisms (throttled year coverage, the keyword domain gate,
+amendments = acts of parliament only, EU-only graph edges, heuristic impact
+tier, parsed in-force dates), because a service that looks this authoritative
+has to say where it is thin. Screenshots live in `public/docs/*.jpg`, captured
+from the live site and lazy-loaded — the one part that goes stale on a UI
+change. The TOC scrolls the article and never touches `location.hash`, which
+belongs to the app's shareable state. See
+`decisions/2026-09-05-in-app-documentation.md`.
+
 ## URL fragment = shareable state
 
 `src/state/urlState.ts` mirrors the shareable subset of the store (view,
