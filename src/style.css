@@ -625,6 +625,102 @@ body.view-list .legend-panel::-webkit-scrollbar-thumb {
   padding: 4px 12px;
   font-size: 0.72rem;
 }
+/* Date scrubber beside the sort control: a slimmer twin of the timeline
+   track. It takes the toolbar's spare width and wraps under the sort control
+   when the stage is narrow. */
+.range-group {
+  flex: 1 1 280px;
+  min-width: 240px;
+  flex-wrap: nowrap;
+}
+.range-scrubber {
+  flex: 1 1 auto;
+  min-width: 160px;
+  /* A drag that misses a thumb must not start selecting the tick labels. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.range-scrubber svg {
+  display: block;
+}
+.range-scrubber .track-bg {
+  stroke: var(--line);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.range-scrubber .track-fill {
+  stroke: var(--faint);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke 0.18s;
+}
+.range-group.active .range-scrubber .track-fill {
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 5px rgba(56, 232, 255, 0.5));
+}
+.range-scrubber .tick line {
+  stroke: var(--line);
+}
+.range-scrubber .tick text {
+  fill: var(--faint);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+}
+.range-scrubber .thumb {
+  fill: var(--muted);
+  cursor: ew-resize;
+  outline: none;
+  transition: fill 0.18s;
+}
+.range-group.active .range-scrubber .thumb {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 6px rgba(56, 232, 255, 0.7));
+}
+.range-scrubber .thumb:focus-visible {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.range-scrubber .hit {
+  fill: transparent;
+  cursor: pointer;
+}
+/* Fixed width for the readout and a reserved slot for the clear button, so
+   the track does not shift under a thumb being dragged away from an end. */
+.range-readout {
+  flex: 0 0 auto;
+  min-width: 17ch;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.range-group.active .range-readout {
+  color: var(--ink);
+}
+.range-clear {
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    color 0.16s,
+    border-color 0.16s;
+}
+.range-clear[hidden] {
+  display: inline-block;
+  visibility: hidden;
+}
+.range-clear:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
 .list-count {
   flex: 0 0 auto;
   font-size: 0.66rem;

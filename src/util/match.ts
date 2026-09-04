@@ -1,5 +1,31 @@
 import type { RegulationEvent } from "../../shared/schema";
-import type { AppState } from "../state/appState";
+import type { AppState, ListRange, ListSort } from "../state/appState";
+
+/** `YYYY-MM` — the grain of {@link ListRange}. */
+export function isYearMonth(v: unknown): v is string {
+  return typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+}
+
+/** The date the list's active sort orders, groups and shows. Null = unknown. */
+export function listDate(e: RegulationEvent, sort: ListSort): string | null {
+  return sort === "announced" ? e.dateAnnounced : e.dateInForce;
+}
+
+/**
+ * True if `iso` (yyyy-mm-dd) falls in the inclusive month range. An open
+ * range passes everything, an unknown date included; once either end is set,
+ * an unknown date fails — "voimaan 2026–2027" cannot vouch for an act whose
+ * commencement is still to be decreed. `YYYY-MM` strings compare
+ * lexicographically, so no Date arithmetic or time zones are involved.
+ */
+export function inListRange(iso: string | null, range: ListRange): boolean {
+  if (range.from === null && range.to === null) return true;
+  if (iso === null) return false;
+  const ym = iso.slice(0, 7);
+  if (range.from !== null && ym < range.from) return false;
+  if (range.to !== null && ym > range.to) return false;
+  return true;
+}
 
 /** True if the event is excluded by the active legend facet filters. */
 export function isFiltered(
@@ -87,11 +113,28 @@ export function matchesQuery(e: RegulationEvent, query: string): boolean {
 
 /**
  * The combined visibility predicate ANDing legend filters and search.
- * (The timeline cursor gate is applied separately by the radar/feed.)
+ * (The timeline cursor gate is applied separately by the radar/feed, and the
+ * list's own date range by {@link passesListFilters}.)
  */
 export function passesFiltersAndQuery(
   e: RegulationEvent,
   state: AppState,
 ): boolean {
   return !isFiltered(e, state.filters) && matchesQuery(e, state.query);
+}
+
+/**
+ * The list view's predicate: facet filters AND search AND the month range on
+ * the sort date. The range is one more conjunct, never a replacement — a
+ * search for "kilpailu" with 2015–2020 selected shows competition law from
+ * those years only.
+ */
+export function passesListFilters(
+  e: RegulationEvent,
+  state: AppState,
+): boolean {
+  return (
+    passesFiltersAndQuery(e, state) &&
+    inListRange(listDate(e, state.listSort), state.listRange)
+  );
 }

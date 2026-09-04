@@ -165,12 +165,25 @@ Conventions for new entries:
   It validates what a mirror serves before writing, so an HTML error page can
   never land in `public/data/`.
 
+## List view: sort + date scrubber
+
+The list toolbar carries the sort control (*Annettu / Voimaan*) and, beside it,
+a two-thumb month-range scrubber (`src/list/rangeScrubber.ts`). The range is
+`listRange: { from, to }` as `YYYY-MM` strings, `null` = unbounded, so the
+default filters nothing, persists as nothing and writes no fragment key. It
+ranges over **whichever date the sort uses**, and it is one more conjunct
+after the facet filters and the search (`passesListFilters` in
+`src/util/match.ts`) — never a replacement for them. Undated acts fail any
+bounded range. The track spans the data's years, not the coverage years,
+because in-force dates run ahead. List-only: the other views keep the cursor.
+See `decisions/2026-09-04-list-date-scrubber.md`.
+
 ## URL fragment = shareable state
 
 `src/state/urlState.ts` mirrors the shareable subset of the store (view,
-dimension, filters, list sort, query, selected act, timeline cursor) into
-`location.hash`, e.g. `#view=list&jur=FI&id=fi:1390/2025`. Two rules worth
-keeping: **a link is a snapshot** — any shared key the fragment omits is at its
+dimension, filters, list sort and date range, query, selected act, timeline
+cursor) into `location.hash`, e.g.
+`#view=list&jur=FI&from=2015&to=2020&id=fi:1390/2025`. Two rules worth keeping: **a link is a snapshot** — any shared key the fragment omits is at its
 *default*, not at whatever the recipient's localStorage has, so the sender and
 the recipient see the same page; and **only non-default values are written**,
 so the default state has no fragment at all. Play mode and speed stay

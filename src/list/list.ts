@@ -4,10 +4,11 @@ import {
   INSTRUMENT_LABELS,
   JURISDICTION_LABELS,
 } from "../../shared/schema";
-import type { AppState, ListSort } from "../state/appState";
+import type { AppState, ListRange, ListSort } from "../state/appState";
 import { colorForCategory, colorForEvent } from "../util/colors";
 import { formatDate } from "../util/format";
-import { passesFiltersAndQuery } from "../util/match";
+import { listDate as sortDate, passesListFilters } from "../util/match";
+import { RangeScrubber } from "./rangeScrubber";
 
 /** Rows appended per chunk. Scrolling near the end appends the next chunk. */
 const CHUNK = 200;
@@ -24,11 +25,6 @@ const dayFmt = new Intl.DateTimeFormat("fi-FI", {
 
 function dateOf(iso: string): Date {
   return new Date(`${iso}T12:00:00Z`);
-}
-
-/** The date the active sort orders, groups and shows. Null = unknown. */
-function sortDate(e: RegulationEvent, sort: ListSort): string | null {
-  return sort === "announced" ? e.dateAnnounced : e.dateInForce;
 }
 
 const SORTS: { id: ListSort; label: string; hint: string }[] = [
@@ -54,15 +50,17 @@ const FLAG: Record<Jurisdiction, { fg: string }> = {
  * year dividers and incremental rendering (200 rows at a time, extended as you
  * scroll — no pagination).
  *
- * Filtering is **not** here: the dock's legend panel is the single home for it
- * (in this view it shows every facet, not just the sector dimension), so the
- * list's own toolbar carries nothing but the sort control.
+ * Facet filtering is **not** here: the dock's legend panel is the single home
+ * for it (in this view it shows every facet, not just the sector dimension).
+ * The list's own toolbar carries the sort control and, next to it, the date
+ * scrubber — a month range on whichever date the sort uses, ANDed with the
+ * facets and the search. It rests at "everything".
  *
  * Unlike the radar, trend and dock feed this view deliberately ignores the
  * timeline cursor: it is the "browse everything" view, so `main.ts` hides the
- * timeline bar while it is active. Legend filters, the dimension switcher
- * (which colours the row swatches) and the search box all still apply, via the
- * same store.
+ * timeline bar while it is active; the scrubber is its own, list-only "when".
+ * Legend filters, the dimension switcher (which colours the row swatches) and
+ * the search box all still apply, via the same store.
  */
 export class ListComponent {
   private view: HTMLElement;
@@ -71,15 +69,17 @@ export class ListComponent {
   private scroll: HTMLElement;
   private body: HTMLElement;
   private sentinel: HTMLElement;
+  private sortButtons: HTMLButtonElement[] = [];
+  private scrubber: RangeScrubber;
 
   private state: AppState | null = null;
+  private lastEvents: RegulationEvent[] | null = null;
   private items: RegulationEvent[] = [];
   private rendered = 0;
   private lastYear = -1;
   private lastMonth = -1;
   private rowById = new Map<string, HTMLElement>();
   private lastDataKey = "";
-  private lastSort = "";
   private lastDimension = "";
   private lastSelected: string | null = null;
 
@@ -87,6 +87,7 @@ export class ListComponent {
     private container: HTMLElement,
     private onSelect: (e: RegulationEvent) => void,
     private onSortChange: (sort: ListSort) => void,
+    onRangeChange: (range: ListRange) => void,
   ) {
     container.classList.add("list-host");
     this.view = document.createElement("div");
@@ -104,6 +105,8 @@ export class ListComponent {
     this.scroll.append(this.body, this.sentinel);
     this.view.append(this.toolbar, this.head, this.scroll);
     container.appendChild(this.view);
+    this.renderSort();
+    this.scrubber = new RangeScrubber(this.toolbar, onRangeChange);
 
     // Append the next chunk before the sentinel is actually reached, so the
     // list never shows a seam while scrolling fast.
@@ -119,20 +122,33 @@ export class ListComponent {
   update(state: AppState, events: RegulationEvent[]): void {
     this.state = state;
 
-    const filterKey = JSON.stringify(state.filters);
-    if (state.listSort !== this.lastSort) {
-      this.lastSort = state.listSort;
-      this.renderSort(state);
+    // The scrubber's track spans the data, not the coverage years: in-force
+    // dates run ahead of announcement dates (EU regulations applying from
+    // 2027), and the same track serves both sorts.
+    if (events !== this.lastEvents) {
+      this.lastEvents = events;
+      this.scrubber.setDomain(...yearSpan(events));
     }
+    for (const btn of this.sortButtons) {
+      btn.classList.toggle("active", btn.dataset.sort === state.listSort);
+    }
+    this.scrubber.update(state.listRange, state.listSort);
 
-    const dataKey = `${filterKey}|${state.query}|${state.listSort}`;
+    const dataKey = [
+      JSON.stringify(state.filters),
+      state.query,
+      state.listSort,
+      state.listRange.from,
+      state.listRange.to,
+    ].join("|");
     if (dataKey !== this.lastDataKey) {
       this.lastDataKey = dataKey;
-      const matched = events.filter((e) => passesFiltersAndQuery(e, state));
+      const matched = events.filter((e) => passesListFilters(e, state));
       // Sorting by entry into force, ~7 % of Finnish amendments have no date
       // (open-ended commencement, "asetuksella säädettävänä ajankohtana").
       // They keep their place in the list, in a trailing group, rather than
-      // being silently dropped.
+      // being silently dropped — unless a date range is set, which they
+      // cannot be known to satisfy (see `inListRange`).
       const dated = matched.filter((e) => sortDate(e, state.listSort) !== null);
       const undated = matched.filter(
         (e) => sortDate(e, state.listSort) === null,
@@ -203,8 +219,12 @@ export class ListComponent {
     if (this.items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "list-empty";
-      empty.textContent =
-        "Ei osumia — löysää suodattimia tai tyhjennä haku.";
+      const ranged =
+        this.state &&
+        (this.state.listRange.from !== null || this.state.listRange.to !== null);
+      empty.textContent = ranged
+        ? "Ei osumia — laajenna ajanjaksoa, löysää suodattimia tai tyhjennä haku."
+        : "Ei osumia — löysää suodattimia tai tyhjennä haku.";
       this.body.appendChild(empty);
       return;
     }
@@ -343,9 +363,11 @@ export class ListComponent {
     return row;
   }
 
-  /** Order-by control: which date the list sorts, groups and shows. */
-  private renderSort(state: AppState): void {
-    this.toolbar.innerHTML = "";
+  /**
+   * Order-by control: which date the list sorts, groups and shows — and which
+   * date the scrubber beside it ranges over. Built once; `update` toggles.
+   */
+  private renderSort(): void {
     const group = document.createElement("div");
     group.className = "list-toolbar-group";
     const caption = document.createElement("span");
@@ -360,11 +382,34 @@ export class ListComponent {
       btn.type = "button";
       btn.textContent = sort.label;
       btn.title = sort.hint;
-      btn.classList.toggle("active", sort.id === state.listSort);
+      btn.dataset.sort = sort.id;
       btn.addEventListener("click", () => this.onSortChange(sort.id));
       seg.appendChild(btn);
+      this.sortButtons.push(btn);
     }
     group.appendChild(seg);
     this.toolbar.appendChild(group);
   }
+}
+
+/**
+ * First and last year any event's announcement or in-force date touches —
+ * the scrubber's track. Falls back to the current year for an empty dataset.
+ */
+function yearSpan(events: RegulationEvent[]): [number, number] {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const e of events) {
+    for (const iso of [e.dateAnnounced, e.dateInForce]) {
+      if (!iso) continue;
+      const y = Number(iso.slice(0, 4));
+      if (y < lo) lo = y;
+      if (y > hi) hi = y;
+    }
+  }
+  if (!Number.isFinite(lo)) {
+    const now = new Date().getUTCFullYear();
+    return [now, now];
+  }
+  return [lo, hi];
 }

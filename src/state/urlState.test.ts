@@ -56,6 +56,7 @@ test("every shared key round-trips", () => {
       impact: ["high", "medium"],
     },
     listSort: "inForce",
+    listRange: { from: "2015-01", to: "2020-12" },
     query: "alv 25,5 %",
     selectedEventId: "eu:32016R0679",
     timelinePosition: Date.UTC(2018, 4, 25),
@@ -68,7 +69,8 @@ test("every shared key round-trips", () => {
   assert.equal(
     h,
     "view=trend&dim=impact&dom=tax_duties,data_protection&jur=EU" +
-      "&imp=high,medium&sort=inForce&q=alv%2025,5%20%25" +
+      "&imp=high,medium&sort=inForce&from=2015-01&to=2020-12" +
+      "&q=alv%2025,5%20%25" +
       "&id=eu:32016R0679&t=2018-05-25",
   );
   assert.deepEqual(stateFromHash(h, ctx), pickShared(s));
@@ -135,4 +137,29 @@ test("a cursor inside the default day serializes to no key", () => {
 test("query survives characters URLSearchParams treats specially", () => {
   const s = state({ query: "a&b=c+d #e" });
   assert.equal(stateFromHash(serializeHash(s, ctx), ctx)!.query, "a&b=c+d #e");
+});
+
+test("list range: open ends are omitted, bare years mean whole years", () => {
+  const s = state({ view: "list", listRange: { from: "2015-06", to: null } });
+  assert.equal(serializeHash(s, ctx), "view=list&from=2015-06");
+  assert.deepEqual(stateFromHash("view=list&from=2015-06", ctx), pickShared(s));
+
+  assert.deepEqual(parseHash("from=2015&to=2020", ctx)!.listRange, {
+    from: "2015-01",
+    to: "2020-12",
+  });
+  // A full date is truncated to its month; an inverted pair is swapped.
+  assert.deepEqual(parseHash("from=2020-03-15&to=2015-06", ctx)!.listRange, {
+    from: "2015-06",
+    to: "2020-03",
+  });
+  // Nonsense at one end falls out; the other end survives.
+  assert.deepEqual(parseHash("from=2015-13&to=soon", ctx)!.listRange, {
+    from: null,
+    to: null,
+  });
+  assert.deepEqual(parseHash("from=x&to=2020", ctx)!.listRange, {
+    from: null,
+    to: "2020-12",
+  });
 });

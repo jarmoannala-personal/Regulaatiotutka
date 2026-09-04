@@ -149,6 +149,7 @@ async function boot(): Promise<void> {
     listHost,
     (e: RegulationEvent) => store.set({ selectedEventId: e.id }),
     (listSort) => store.set({ listSort }),
+    (listRange) => store.set({ listRange }),
   );
 
   const timeline = new TimelineControl(timelineEl, timeDomain, {

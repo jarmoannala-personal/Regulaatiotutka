@@ -20,6 +20,18 @@ export type ViewMode = "radar" | "trend" | "graph" | "list";
  */
 export type ListSort = "announced" | "inForce";
 
+/**
+ * List view only: an inclusive month range on the date the active sort uses.
+ * Values are `YYYY-MM`; `null` at either end means unbounded, so the default
+ * `{ from: null, to: null }` filters nothing. Months, not days: the control is
+ * a scrubber, and a month is the finest grain a thumb can place reliably on a
+ * 25-year track — and the finest a shared link needs.
+ */
+export interface ListRange {
+  from: string | null;
+  to: string | null;
+}
+
 export interface AppState {
   /** Which main visualization is showing. Persisted. */
   view: ViewMode;
@@ -41,6 +53,11 @@ export interface AppState {
   };
   /** List view only: order by announcement or by entry into force. Persisted. */
   listSort: ListSort;
+  /**
+   * List view only: month range on the sort date, ANDed with the facet
+   * filters and the search. Persisted like the other filters.
+   */
+  listRange: ListRange;
   /** Transient: free-text search, ANDed with filters + time cursor. */
   query: string;
   /** Transient: blip open in the detail panel. */
@@ -56,6 +73,7 @@ export const PERSISTED_KEYS = [
   "timelinePosition",
   "filters",
   "listSort",
+  "listRange",
 ] as const satisfies readonly (keyof AppState)[];
 
 export function defaultState(coverage: {
@@ -73,6 +91,7 @@ export function defaultState(coverage: {
     timelinePosition: Date.UTC(coverage.fromYear, 0, 1),
     filters: { domains: [], jurisdictions: [], impact: [] },
     listSort: "announced",
+    listRange: { from: null, to: null },
     query: "",
     selectedEventId: null,
   };

@@ -5,6 +5,7 @@ import {
 } from "../../shared/schema";
 import type { AppState, CategoryDimension, PlaySpeed } from "./appState";
 import { PERSISTED_KEYS } from "./appState";
+import { isYearMonth } from "../util/match";
 
 // v2: redesign changed defaults (cursor starts at 2000) and semantics.
 const STORAGE_KEY = "regulaatiotutka.state.v2";
@@ -59,6 +60,13 @@ export function loadPersisted(defaults: AppState): AppState {
   }
   if (parsed.listSort === "announced" || parsed.listSort === "inForce") {
     next.listSort = parsed.listSort;
+  }
+  if (typeof parsed.listRange === "object" && parsed.listRange !== null) {
+    const r = parsed.listRange as Record<string, unknown>;
+    const from = isYearMonth(r.from) ? r.from : null;
+    const to = isYearMonth(r.to) ? r.to : null;
+    // An inverted range would show nothing; treat it as corrupt.
+    if (!(from && to && from > to)) next.listRange = { from, to };
   }
   if (typeof parsed.filters === "object" && parsed.filters !== null) {
     const f = parsed.filters as Record<string, unknown>;

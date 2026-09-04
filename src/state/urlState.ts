@@ -28,6 +28,7 @@ import type {
   ListSort,
   ViewMode,
 } from "./appState";
+import { isYearMonth } from "../util/match";
 
 /** Store keys the fragment carries. Everything else is device-local. */
 export const SHARED_KEYS = [
@@ -35,6 +36,7 @@ export const SHARED_KEYS = [
   "dimension",
   "filters",
   "listSort",
+  "listRange",
   "query",
   "selectedEventId",
   "timelinePosition",
@@ -70,6 +72,8 @@ const KEY = {
   jurisdictions: "jur",
   impact: "imp",
   listSort: "sort",
+  rangeFrom: "from",
+  rangeTo: "to",
   query: "q",
   selectedEventId: "id",
   timelinePosition: "t",
@@ -86,6 +90,7 @@ export function pickShared(state: AppState): SharedState {
       impact: [...state.filters.impact],
     },
     listSort: state.listSort,
+    listRange: { ...state.listRange },
     query: state.query,
     selectedEventId: state.selectedEventId,
     timelinePosition: state.timelinePosition,
@@ -111,6 +116,18 @@ function parseIsoDay(s: string): number | null {
   const ms = Date.UTC(y, mo - 1, d);
   // Reject Feb 30 and friends: Date.UTC silently rolls them over.
   return new Date(ms).getUTCDate() === d ? ms : null;
+}
+
+/**
+ * A range end from the fragment, normalised to `YYYY-MM`. A bare year means
+ * the whole year — `from=2015` is January, `to=2020` is December — and a full
+ * date is truncated to its month, the range's grain.
+ */
+function parseYearMonth(s: string, end: "from" | "to"): string | null {
+  const m = /^(\d{4})(?:-(\d{2})(?:-\d{2})?)?$/.exec(s);
+  if (!m) return null;
+  const ym = m[2] ? `${m[1]}-${m[2]}` : `${m[1]}-${end === "from" ? "01" : "12"}`;
+  return isYearMonth(ym) ? ym : null;
 }
 
 function sameList(a: readonly string[], b: readonly string[]): boolean {
@@ -151,6 +168,9 @@ export function serializeHash(state: AppState, ctx: UrlContext): string {
     put(KEY.impact, state.filters.impact.join(","));
   }
   if (state.listSort !== d.listSort) put(KEY.listSort, state.listSort);
+  // The default is open at both ends, so any bound is worth writing.
+  if (state.listRange.from) put(KEY.rangeFrom, state.listRange.from);
+  if (state.listRange.to) put(KEY.rangeTo, state.listRange.to);
   if (state.query.trim() !== d.query.trim()) put(KEY.query, state.query.trim());
   if (state.selectedEventId && state.selectedEventId !== d.selectedEventId) {
     put(KEY.selectedEventId, state.selectedEventId);
@@ -219,6 +239,13 @@ export function parseHash(
   if (has(KEY.listSort)) {
     const v = params.get(KEY.listSort) as ListSort;
     if (SORTS.includes(v)) out.listSort = v;
+  }
+  if (has(KEY.rangeFrom) || has(KEY.rangeTo)) {
+    let from = parseYearMonth((params.get(KEY.rangeFrom) ?? "").trim(), "from");
+    let to = parseYearMonth((params.get(KEY.rangeTo) ?? "").trim(), "to");
+    // A hand-edited `from=2020&to=2015` means the range between them.
+    if (from && to && from > to) [from, to] = [to, from];
+    out.listRange = { from, to };
   }
   if (has(KEY.query)) {
     out.query = (params.get(KEY.query) ?? "").trim();
