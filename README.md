@@ -46,7 +46,11 @@ hand-curated EN/acronym↔Finnish + CELEX alias map, so "gdpr", "ai act" or
 
 - **No runtime backend.** A build-time pipeline (`pipeline/`) fetches and
   normalizes open data into a single static `public/data/regulations.v1.json`
-  the frontend loads. Settings persist in `localStorage`.
+  the frontend loads. Settings persist in `localStorage`; the shareable part
+  of them (view, filters, search, selected act, timeline cursor) also mirrors
+  into the URL fragment, so the address bar is always a link to what is on
+  screen — `…/#view=list&jur=FI&id=fi:1390/2025` opens the list, Finnish law
+  only, with that act selected, on any host.
 - `shared/schema.ts` is the single data contract, imported by both the pipeline
   and the app, so the JSON shape can't drift. Swapping to a future
   "data as a service" is a one-line URL change in `src/data/loadDataset.ts`.

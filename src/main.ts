@@ -18,6 +18,12 @@ import { SweepDriver } from "./radar/sweep";
 import { TrendComponent } from "./trend/trend";
 import { createStore, defaultState } from "./state/appState";
 import { loadPersisted, savePersisted } from "./state/persistence";
+import {
+  pickShared,
+  serializeHash,
+  stateFromHash,
+  type UrlContext,
+} from "./state/urlState";
 
 function fatal(msg: string): void {
   const c = document.getElementById("stage");
@@ -54,7 +60,17 @@ async function boot(): Promise<void> {
   ];
 
   const defaults = defaultState(dataset.coverage);
-  const store = createStore(loadPersisted(defaults));
+  const knownIds = new Set(events.map((e) => e.id));
+  const urlCtx: UrlContext = {
+    defaults,
+    timeRange: [timeDomain[0].getTime(), timeDomain[1].getTime()],
+    isKnownId: (id) => knownIds.has(id),
+  };
+  // A shared link wins over what this device last had; without one, the
+  // device's own persisted state is the starting point as before.
+  const persisted = loadPersisted(defaults);
+  const linked = stateFromHash(location.hash, urlCtx);
+  const store = createStore(linked ? { ...persisted, ...linked } : persisted);
 
   const radarHost = document.getElementById("radar-host")!;
   const trendHost = document.getElementById("trend-host")!;
@@ -72,9 +88,41 @@ async function boot(): Promise<void> {
   setupDockToggle(topbarControls);
   setupAbout(topbarControls);
   enableDockResize(document.getElementById("rightdock")!);
-  setupSearch(document.getElementById("search")!, (q) =>
+  const search = setupSearch(document.getElementById("search")!, (q) =>
     store.set({ query: q }),
   );
+  search.setQuery(store.get().query);
+
+  // Mirror the shareable subset of the state into the fragment, so the URL
+  // bar is always a link to what is on screen. replaceState (not the hash
+  // setter) keeps the back button clean and does not fire hashchange. One
+  // pending write at a time: while the sweep plays the cursor moves every
+  // frame, and this coalesces it to a few writes a second.
+  let hashTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastHash = serializeHash(store.get(), urlCtx);
+  const syncHash = () => {
+    if (hashTimer) return;
+    hashTimer = setTimeout(() => {
+      hashTimer = undefined;
+      const next = serializeHash(store.get(), urlCtx);
+      if (next === lastHash) return;
+      lastHash = next;
+      history.replaceState(
+        null,
+        "",
+        location.pathname + location.search + (next ? `#${next}` : ""),
+      );
+    }, 250);
+  };
+  // The user pasted or edited a fragment by hand (our own writes never fire
+  // this). Treat it like opening the link: shared keys from the fragment,
+  // the rest of the shared keys reset, device-local keys untouched.
+  window.addEventListener("hashchange", () => {
+    const next = stateFromHash(location.hash, urlCtx) ?? pickShared(defaults);
+    lastHash = serializeHash({ ...store.get(), ...next }, urlCtx);
+    search.setQuery(next.query);
+    store.set({ ...next, playing: false });
+  });
 
   // Keep the stage clear of the (variable-height) top bar and timeline bar.
   const topbarEl = document.querySelector<HTMLElement>(".topbar")!;
@@ -197,6 +245,7 @@ async function boot(): Promise<void> {
     );
     sweep.sync(s);
     savePersisted(s);
+    syncHash();
   });
 
   renderCategorySwitcher(switcherEl, store.get().dimension, (dim) =>

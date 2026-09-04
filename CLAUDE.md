@@ -165,6 +165,19 @@ Conventions for new entries:
   It validates what a mirror serves before writing, so an HTML error page can
   never land in `public/data/`.
 
+## URL fragment = shareable state
+
+`src/state/urlState.ts` mirrors the shareable subset of the store (view,
+dimension, filters, list sort, query, selected act, timeline cursor) into
+`location.hash`, e.g. `#view=list&jur=FI&id=fi:1390/2025`. Two rules worth
+keeping: **a link is a snapshot** — any shared key the fragment omits is at its
+*default*, not at whatever the recipient's localStorage has, so the sender and
+the recipient see the same page; and **only non-default values are written**,
+so the default state has no fragment at all. Play mode and speed stay
+device-local; the graph's zoom is not state. The codec is pure and covered by
+`npm test` (node:test via tsx, `tsconfig.test.json`). See
+`decisions/2026-09-04-url-fragment-state.md`.
+
 ## Conventions
 
 - Version bumps: `npm run bump` (patch) or edit `version` for a minor; the

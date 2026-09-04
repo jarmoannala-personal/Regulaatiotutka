@@ -163,10 +163,27 @@ export class ListComponent {
         this.rowById.get(this.lastSelected)?.classList.remove("selected");
       }
       if (state.selectedEventId) {
-        this.rowById.get(state.selectedEventId)?.classList.add("selected");
+        this.revealRow(state.selectedEventId)?.classList.add("selected");
       }
       this.lastSelected = state.selectedEventId;
     }
+  }
+
+  /**
+   * The row for `id`, rendering further chunks if it is below what has been
+   * appended so far, and scrolled into view. A selection made by clicking is
+   * already on screen, so `nearest` is a no-op there; a selection that
+   * arrived in a shared link may be thousands of rows down.
+   */
+  private revealRow(id: string): HTMLElement | undefined {
+    const index = this.items.findIndex((e) => e.id === id);
+    if (index < 0) return undefined;
+    while (this.rendered <= index && this.rendered < this.items.length) {
+      this.renderMore();
+    }
+    const row = this.rowById.get(id);
+    row?.scrollIntoView({ block: "nearest" });
+    return row;
   }
 
   private rebuild(): void {

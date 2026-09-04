@@ -1,6 +1,6 @@
 {
   "name": "regulaatiotutka",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "type": "module",
   "description": "Regulation Radar — sweep-radar visualization of Finnish and EU legislative change",
@@ -16,7 +16,8 @@
     "dev": "vite",
     "dev:all": "npm run pipeline && vite",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.pipeline.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.pipeline.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "bump": "npm version patch --no-git-tag-version"
   },
   "dependencies": {
