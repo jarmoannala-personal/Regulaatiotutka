@@ -8,13 +8,16 @@ export const TO_YEAR = new Date().getUTCFullYear();
 
 /**
  * Hard cap on dataset size to keep the radar legible and the JSON small.
+ * At 2500 events the dataset is ~1.9 MB, ~235 kB over the wire gzipped, so the
+ * ceiling is rendering, not bandwidth — raised from 2500 once the cap started
+ * binding on every build and cost only historical breadth.
  * When exceeded, all `high` are kept, then `medium`, then the most-recent
  * `low` until the cap (see `dedupe.ts` -> `capEvents`).
  *
  * The curated seed and everything from {@link KEEP_FROM_YEAR} onwards are
  * exempt — the cap may only cost historical breadth, never recent law.
  */
-export const MAX_EVENTS = 2500;
+export const MAX_EVENTS = 6000;
 
 /**
  * Recent-window floor: events announced in this year or later always survive
@@ -51,10 +54,18 @@ export const FINLEX_SPACING_MS = 120;
 /** 429 retry policy: exponential backoff, capped, honouring Retry-After. */
 export const FINLEX_MAX_RETRIES = 5;
 export const FINLEX_MAX_BACKOFF_MS = 15_000;
-/** Overall wall-clock budget for Finlex so the build stays bounded. Years are
- *  fetched newest-first, so an exhausted budget costs breadth in the 2000s,
- *  not this year's statutes. */
+/** Overall wall-clock budget for Finlex so the build stays bounded. The recent
+ *  window is fetched first, so an exhausted budget costs a backfill year, not
+ *  this year's statutes. */
 export const FINLEX_BUDGET_MS = 300_000;
+
+/**
+ * How many pre-{@link KEEP_FROM_YEAR} years the consolidated crawl backfills
+ * per run, on a rotation (see `crawlYears`). The archive keeps what earlier
+ * runs fetched, so the whole 2000→ history is swept in a handful of monthly
+ * builds without ever spending this run's budget on years already covered.
+ */
+export const FINLEX_BACKFILL_YEARS = 4;
 
 /** Säädöskokoelma crawl (amending acts). ~1500 statutes/year, and the endpoint
  *  returns each twice at 10 per page, so a full year is ~300 pages — hence the

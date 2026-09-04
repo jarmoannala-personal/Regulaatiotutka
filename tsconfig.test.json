@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["src/**/*.test.ts", "shared"]
+  "include": ["src/**/*.test.ts", "pipeline/**/*.test.ts", "shared"]
 }

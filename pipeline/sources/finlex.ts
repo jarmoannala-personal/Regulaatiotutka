@@ -4,6 +4,7 @@ import {
   FINLEX_AMENDMENT_BUDGET_MS,
   FINLEX_AMENDMENT_MAX_PAGES_PER_YEAR,
   FINLEX_AMENDMENT_YEARS,
+  FINLEX_BACKFILL_YEARS,
   FINLEX_BASE,
   FINLEX_BUDGET_MS,
   FINLEX_MAX_BACKOFF_MS,
@@ -12,10 +13,12 @@ import {
   FINLEX_PAGE_LIMIT,
   FINLEX_SPACING_MS,
   FROM_YEAR,
+  KEEP_FROM_YEAR,
   SOURCE_TIMEOUT_MS,
   TO_YEAR,
   USER_AGENT,
 } from "../config.js";
+import { crawlYears } from "../crawlYears.js";
 import { normalizeFinlex, type FinlexItem } from "../normalize/toEvent.js";
 
 /** Ajantasainen text. New statutes only — amendments are folded into the
@@ -421,7 +424,8 @@ async function fetchPage(
 interface CrawlOptions {
   label: string;
   searchUrl: string;
-  fromYear: number;
+  /** Years to fetch, in priority order — the budget is spent front to back. */
+  years: number[];
   maxPagesPerYear: number;
   budgetMs: number;
   /** Node -> item, or null to skip (out of scope for this crawl). */
@@ -429,20 +433,20 @@ interface CrawlOptions {
 }
 
 /**
- * Page one Finlex document set year-by-year, newest year first, and normalize.
+ * Page one Finlex document set year by year, in the order given, and normalize.
  *
- * Newest-first matters: when the wall-clock budget runs out (Finlex throttles
- * hard), the years we lose should be the oldest ones, not this year's law.
- * A failing year is logged and skipped; total failure throws so the caller
- * falls back to the committed seed.
+ * Order matters: when the wall-clock budget runs out (Finlex throttles hard),
+ * the years we lose are the ones at the back of the list, so callers put the
+ * recent window first (see `crawlYears`). A failing year is logged and
+ * skipped; total failure throws so the caller falls back to the seed and, if
+ * there is one, the archive.
  */
 async function crawl(opts: CrawlOptions): Promise<RegulationEvent[]> {
-  const lastYear = Math.min(TO_YEAR, new Date().getUTCFullYear());
   const byId = new Map<string, RegulationEvent>();
   const deadline = Date.now() + opts.budgetMs;
   let ok = 0;
 
-  for (let year = lastYear; year >= opts.fromYear; year--) {
+  for (const year of opts.years) {
     if (Date.now() > deadline) {
       console.warn(`[${opts.label}] time budget reached, stopping at ${year}`);
       break;
@@ -476,12 +480,23 @@ async function crawl(opts: CrawlOptions): Promise<RegulationEvent[]> {
 /**
  * Finnish consolidated statutes, keyword-mapped to a domain, out-of-scope
  * statutes dropped. Live Finlex is bonus breadth on top of the committed seed.
+ *
+ * The recent window is crawled every run; older years arrive a rotating slice
+ * at a time and persist through the archive, so history accumulates instead of
+ * being re-rolled — and lost — on every build.
  */
 export function fetchFinlex(): Promise<RegulationEvent[]> {
+  const years = crawlYears({
+    fromYear: FROM_YEAR,
+    toYear: Math.min(TO_YEAR, new Date().getUTCFullYear()),
+    recentFromYear: KEEP_FROM_YEAR,
+    backfill: FINLEX_BACKFILL_YEARS,
+  });
+  console.log(`[finlex] years this run: ${years.join(", ")}`);
   return crawl({
     label: "finlex",
     searchUrl: CONSOLIDATED_URL,
-    fromYear: FROM_YEAR,
+    years,
     maxPagesPerYear: FINLEX_MAX_PAGES_PER_YEAR,
     budgetMs: FINLEX_BUDGET_MS,
     toItem,
@@ -496,10 +511,13 @@ export function fetchFinlex(): Promise<RegulationEvent[]> {
  */
 export function fetchFinlexAmendments(): Promise<RegulationEvent[]> {
   const lastYear = Math.min(TO_YEAR, new Date().getUTCFullYear());
+  const first = Math.max(FROM_YEAR, lastYear - FINLEX_AMENDMENT_YEARS + 1);
+  const years: number[] = [];
+  for (let y = lastYear; y >= first; y--) years.push(y);
   return crawl({
     label: "finlex-amendments",
     searchUrl: STATUTE_URL,
-    fromYear: Math.max(FROM_YEAR, lastYear - FINLEX_AMENDMENT_YEARS + 1),
+    years,
     maxPagesPerYear: FINLEX_AMENDMENT_MAX_PAGES_PER_YEAR,
     budgetMs: FINLEX_AMENDMENT_BUDGET_MS,
     toItem: toAmendmentItem,

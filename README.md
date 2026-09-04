@@ -79,15 +79,22 @@ with a cooldown**, amendments first: run in parallel they 429 each other out,
 and run back to back the first one's throttling swallows the second.
 
 The pipeline merges the seed in every run for baseline coverage and **always
-exits 0**: if both live sources are unreachable it writes the seed with
-`origin: "seed-fallback"` and the UI shows an offline banner. Finlex is
-rate-limited (HTTP 429) and capped by a wall-clock budget, so live FI breadth
-varies run to run — the seed guarantees the important laws are always present
-(Finlex years are fetched newest-first so an exhausted budget costs breadth in
-the 2000s, not this year's statutes). The `MAX_EVENTS` cap (2500) exempts both
-the seed and everything from `KEEP_FROM_YEAR` onwards, so it can only ever cost
-historical breadth — never recent law. The resulting dataset is ~2 MB, ~190 kB
-gzipped; serve it compressed.
+exits 0**: if every live source is unreachable it falls back to the last
+published dataset, and failing that to the seed with `origin: "seed-fallback"`
+and an offline banner in the UI. Finlex is rate-limited (HTTP 429) and capped
+by a wall-clock budget, so live FI breadth varies run to run — the seed
+guarantees the important laws are always present.
+
+**Coverage accumulates.** The last published dataset is fed back in as an
+archive, so a year crawled once stays in the data; live records win outright,
+and the archive only supplies what this run did not reach. That is what lets
+the consolidated crawl fetch the recent window plus a rotating slice of older
+years each run (`crawlYears`) instead of re-rolling 2000→now and losing
+whatever the throttle blocked that day. `REBUILD=1 npm run pipeline` ignores
+the archive and rebuilds from sources alone. The `MAX_EVENTS` cap (6000)
+exempts both the seed and everything from `KEEP_FROM_YEAR` onwards, so it can
+only ever cost historical breadth — never recent law. A 2500-event dataset is
+~1.9 MB, ~235 kB gzipped; serve it compressed.
 
 Two checks guard the hand-curated seed. `npm run validate:seed` is offline and
 checks the data contract (ids, domains, dates within coverage, summary length,

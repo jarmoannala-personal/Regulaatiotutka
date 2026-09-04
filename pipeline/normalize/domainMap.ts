@@ -69,7 +69,15 @@ export function domainFromEurovoc(conceptIds: string[]): Domain | null {
   return best?.domain ?? null;
 }
 
-/** Keyword fallback for FI statutes (and EU titles lacking a mapped concept). */
+/**
+ * Keyword fallback for FI statutes (and EU titles lacking a mapped concept).
+ *
+ * **Order is the tie-breaker**: `domainFromTitle` returns the first rule that
+ * matches, so a title naming both a levy and an employment relationship lands
+ * in the domain listed first. `data_protection` stays ahead of
+ * `employment_labour` so "yksityisyyden suojasta työelämässä" keeps its
+ * privacy tag; `employment_labour` sits ahead of `tax_duties`.
+ */
 export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
   {
     domain: "data_protection",
@@ -82,16 +90,22 @@ export const FI_KEYWORD_RULES: { domain: Domain; pattern: RegExp }[] = [
     pattern: /kirjanpit|tilinpäätös|tilintarkast|kestävyysrapor|raportoin/i,
   },
   {
+    // Before `tax_duties`: an employer obligation is workforce law even when
+    // it is collected as a levy ("työnantajan sairausvakuutusmaksu"), and the
+    // tax pattern's standalone `maksu` would otherwise take it.
+    domain: "employment_labour",
+    // Deliberately broad on `työntekij`/`työnantaj`: a statute naming either
+    // party of an employment relationship is one a company's HR lives under.
+    // `työeläke`, not bare `eläke` — pension *funds* are financial law.
+    pattern:
+      /työsopimu|työsuhde|työaika|työturvalli|työsuojelu|työterveys|työtapaturma|ammattitaut|yhteistoiminta|työehto|työriit|työntekij|työnantaj|työvoima|työeläke|työttömyystur|työttömyysvakuut|palkkatur|palkkaus|palkkatiet|palkkasaat|vuosilom|lomautu|irtisanomis|perhevapa|vanhempainvapa|vuorotteluvapa|opintovapa|vuokratyö|kilpailukielto|yhdenvertaisuus|tasa-arvo|ilmoittaja/i,
+  },
+  {
     domain: "tax_duties",
     // `\bmaksu(t|…)\b` only as a standalone word: bare `maksu` used to swallow
     // maksupalvelu-, seuraamusmaksu- and asiakasmaksu-titles into tax.
     pattern:
       /\bvero|arvonlisävero|tulovero|valmistevero|verotus|tullin?|\bmaksu(t|ja|jen|ista|sta|n)?\b/i,
-  },
-  {
-    domain: "employment_labour",
-    pattern:
-      /työsopimu|työsuhde|työaika|työturvalli|yhteistoiminta|työehto|vuosilom|ilmoittaja/i,
   },
   {
     domain: "financial_securities",

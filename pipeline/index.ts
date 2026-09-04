@@ -9,6 +9,7 @@ import {
   mergeSeed,
   withinCoverage,
 } from "./dedupe.js";
+import { loadArchive } from "./archive.js";
 import { fetchEurLex } from "./sources/eurlex.js";
 import { fetchEurLexEdges } from "./sources/eurlexEdges.js";
 import { fetchFinlex, fetchFinlexAmendments } from "./sources/finlex.js";
@@ -38,32 +39,58 @@ async function loadSeed(): Promise<RegulationEvent[]> {
 }
 
 async function main(): Promise<void> {
+  // The seed is read first so the archive can be told which ids it curates:
+  // the keyword rules must not re-tag or drop a hand-picked landmark.
+  const seed = await loadSeed();
+  const seedIds = new Set(seed.map((e) => e.id));
+  // `REBUILD=1` rebuilds from sources alone — the escape hatch for when the
+  // archive itself is what needs discarding.
+  const rebuild = process.env.REBUILD === "1";
+
   // The two Finlex crawls hit the same rate-limited host, so they run in
   // sequence with a cooldown — in parallel they simply 429 each other out, and
   // back to back the first one's throttling eats the second one whole.
   // Amendments go first: they are the freshest change events and the ones the
   // consolidated set cannot show at all. EUR-Lex is a different service and
-  // runs alongside them.
-  const [[amendments, finlex], eurlex, seed] = await Promise.all([
+  // runs alongside them, as does reading the archive.
+  const [[amendments, finlex], eurlex, archive] = await Promise.all([
     (async () => {
       const amend = await runSource("finlex-amendments", fetchFinlexAmendments);
       await new Promise((r) => setTimeout(r, FINLEX_COOLDOWN_MS));
       return [amend, await runSource("finlex", fetchFinlex)] as const;
     })(),
     runSource("eurlex", fetchEurLex),
-    loadSeed(),
+    rebuild ? Promise.resolve(null) : loadArchive(seedIds),
   ]);
 
   // Consolidated first: for a statute present in both sets its metadata is
   // richer (entry into force, ELI), and dedupe keeps the first id it sees.
   const live = dedupeEvents(...[finlex, amendments, eurlex]);
+  // The archive goes last: a record this run actually crawled wins the whole
+  // entry, and the archive only contributes what the crawl did not reach —
+  // which is the point, since the crawl reaches a rotating slice of history.
+  const accumulated = archive ? dedupeEvents(live, archive.events) : live;
+  if (archive) {
+    console.log(
+      `[pipeline] archive: ${archive.events.length} events from ` +
+        `${archive.source} (generated ${archive.generatedAt}), ` +
+        `${accumulated.length - live.length} kept that this crawl did not ` +
+        `reach, ${archive.retagged} re-tagged, ${archive.dropped} dropped ` +
+        `by the current domain rules`,
+    );
+  } else {
+    console.log(
+      rebuild
+        ? "[pipeline] REBUILD=1: archive skipped, sources only"
+        : "[pipeline] archive: none available, sources only",
+    );
+  }
   // The seed is always merged for baseline coverage, and it is the source of
   // truth on the acts it curates: `mergeSeed` keeps its summary, impact tier,
   // domain and title while taking the live record's extra metadata. Seed ids
   // are also never dropped by the size cap.
-  const seedIds = new Set(seed.map((e) => e.id));
   const merged = capEvents(
-    withinCoverage(mergeSeed(live, seed), FROM_YEAR, TO_YEAR),
+    withinCoverage(mergeSeed(accumulated, seed), FROM_YEAR, TO_YEAR),
     seedIds,
   );
 
@@ -92,11 +119,17 @@ async function main(): Promise<void> {
       `(${curated} curated, ${excerpts} sourced excerpts)`,
   );
 
-  const origin = live.length > 0 ? "pipeline" : "seed-fallback";
+  // A crawl that returned nothing but an archive that did still serves real
+  // published data, so it is not the offline case the banner is for — the
+  // sourceVersion below is where that run says the crawl contributed nothing.
+  const origin = accumulated.length > 0 ? "pipeline" : "seed-fallback";
   const sourceVersion = [
     finlex.length ? "finlex-rest-v1" : null,
     amendments.length ? "finlex-saadoskokoelma" : null,
     eurlex.length ? "eurlex-cellar" : null,
+    archive && accumulated.length > live.length
+      ? `archive-${archive.generatedAt.slice(0, 10)}`
+      : null,
     "seed-2026-08",
   ]
     .filter(Boolean)

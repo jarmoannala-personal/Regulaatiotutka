@@ -137,8 +137,25 @@ Conventions for new entries:
   ("all years failed"); back to back, the consolidated crawl's throttling
   swallows the amendment crawl whole. Both failure modes were observed.
   Amendments go first because they are the freshest and the scarcest.
-- Finlex fetches **newest year first** under a per-crawl wall-clock budget, so a
-  throttled run loses breadth in the 2000s rather than this year's statutes.
+- **The dataset accumulates: the last published dataset is an input.**
+  `pipeline/archive.ts` loads it (local file, then the same mirrors
+  `ensureData` uses) and merges it *after* the live events, so a freshly
+  crawled record wins the whole entry and the archive only supplies what this
+  run did not reach. `REBUILD=1 npm run pipeline` rebuilds from sources alone.
+  Archived `keyword` records are re-tagged offline against the current
+  `domainMap` on load (`refreshKeywordDomains`) — EuroVoc-`tagged` ones are
+  left alone — so a rule change reaches old records without a re-crawl. What
+  it cannot reach is old *rejections*: a statute the domain map dropped was
+  never in the dataset, and only a re-crawl of that year brings it in.
+- **The consolidated crawl no longer sweeps 2000→now every run.**
+  `crawlYears` fetches the recent window (`KEEP_FROM_YEAR`→now) first, then
+  `FINLEX_BACKFILL_YEARS` (4) older years on a slice that advances monthly, so
+  the monthly schedule covers 2000–2023 in six runs and a throttled run costs
+  a backfill year, not this year's law. Amendments still crawl their own
+  recent window only.
+- Finlex fetches the years **in the order the caller lists them** under a
+  per-crawl wall-clock budget, recent window first, so a throttled run loses a
+  backfill year rather than this year's statutes.
   Expect the amendment crawl to cover roughly the current year per build —
   Finlex's throttle allows only a few hundred requests before 429s, and the
   säädöskokoelma returns every statute **twice** at 10 per page (an API quirk,
@@ -146,8 +163,10 @@ Conventions for new entries:
 - Finlex 429s are aggressive and any bulk scan poisons the next few minutes;
   backoff is seconds with `Retry-After`. If a local run shows many
   "429 backoff exhausted" lines, wait before re-running rather than tuning.
-- `MAX_EVENTS` (2500) exempts the seed **and** everything from `KEEP_FROM_YEAR`
-  onwards. The cap may only cost historical breadth, never recent law.
+- `MAX_EVENTS` (6000, was 2500 until it bound on every build) exempts the seed
+  **and** everything from `KEEP_FROM_YEAR` onwards. The cap may only cost
+  historical breadth, never recent law. 2500 events = 1.9 MB raw, ~235 kB
+  gzipped, so the real ceiling is D3 rendering, not bandwidth.
 - Amendment metadata is parsed, not given: the säädöskokoelma carries no
   `inForce` field, so `dateInForce` comes from the statute's own closing
   formula ("Tämä laki tulee voimaan 1 päivänä tammikuuta 2026") and
@@ -155,10 +174,21 @@ Conventions for new entries:
   `extractExcerpts` — are exported from `sources/finlex.ts` and are the right
   place to add a regression test if they ever misfire.
 - The pipeline **always exits 0**. A data-source outage must never fail the
-  build — it degrades to `origin: "seed-fallback"` and the UI shows a banner.
+  build — it degrades to the archive if there is one (`origin` stays
+  `pipeline`, and `sourceVersion` carries `archive-YYYY-MM-DD` with no live
+  source beside it), and to `origin: "seed-fallback"` with the UI banner when
+  there is neither.
 - `pipeline/normalize/domainMap.ts` is what decides whether a live law appears
-  at all. Finnish inflection matters: `\bdata\b` never matches "datan". When a
+  at all — no rule matches, `normalizeFinlex` returns null, the statute is
+  gone. Finnish inflection matters: `\bdata\b` never matches "datan". When a
   known law is missing from the dataset, check this file first.
+  **`FI_KEYWORD_RULES` is order-sensitive**: `domainFromTitle` returns the
+  first match, so `data_protection` sits ahead of `employment_labour`
+  ("yksityisyyden suojasta työelämässä" stays privacy) and
+  `employment_labour` ahead of `tax_duties` (an employer levy is workforce
+  law, not tax — the tax rule's standalone `maksu` used to take it).
+  `pipeline/normalize/domainMap.test.ts` pins that ordering; `npm test` now
+  covers `pipeline/**/*.test.ts` too.
 - `npm run dev` and `npm run build` no longer crawl; `dev:all` / `build:all`
   are the explicit refresh paths. `pipeline/ensureData.ts` is what makes that
   safe — local file, then live mirror, then (cold checkout only) the crawl.
