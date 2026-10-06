@@ -10,8 +10,15 @@ on:
   # covers the current year on every run.
   schedule:
     - cron: "0 5 1 * *"
-  # Manual data refresh between scheduled runs.
+  # Manual data refresh between scheduled runs. With `data_url`, nothing is
+  # crawled: that published dataset is republished verbatim (e.g. the idle.fi
+  # copy, to make Pages match it).
   workflow_dispatch:
+    inputs:
+      data_url:
+        description: "Republish this dataset URL instead of crawling (optional)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -41,13 +48,15 @@ jobs:
       # pulls the currently published dataset from the live site instead, and
       # only falls back to crawling if no mirror answers.
       - name: Build the site, reusing the published dataset
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.data_url != ''
+        env:
+          DATA_URL: ${{ inputs.data_url }}
         run: npm run build
       # Scheduled / manual runs are the ones that refresh the data. The
       # pipeline always exits 0 and falls back to the committed seed if
       # Finlex/EUR-Lex are unreachable, so the build never fails on data.
       - name: Refresh the dataset, then build
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && inputs.data_url == ''
         run: npm run build:all
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
