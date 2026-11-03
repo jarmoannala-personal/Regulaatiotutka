@@ -214,7 +214,8 @@ export class ListComponent {
       this.state?.listSort === "inForce"
         ? "voimaantulon mukaan, uusin ensin"
         : "antopäivän mukaan, uusin ensin";
-    const fresh = this.items.filter(isNew).length;
+    const fresh =
+      this.state?.listSort === "inForce" ? this.items.filter(isNew).length : 0;
     this.head.textContent =
       `${this.items.length} ${noun} · ${order}` +
       (fresh ? ` · ${fresh} uutta (${NEW_DAYS} pv)` : "");
@@ -352,7 +353,7 @@ export class ListComponent {
     ]
       .filter(Boolean)
       .join(" · ");
-    if (isNew(e)) {
+    if (state.listSort === "inForce" && isNew(e)) {
       const pill = document.createElement("span");
       pill.className = "list-new";
       pill.textContent = "UUSI";
