@@ -214,7 +214,10 @@ export class ListComponent {
       this.state?.listSort === "inForce"
         ? "voimaantulon mukaan, uusin ensin"
         : "antopäivän mukaan, uusin ensin";
-    this.head.textContent = `${this.items.length} ${noun} · ${order}`;
+    const fresh = this.items.filter(isNew).length;
+    this.head.textContent =
+      `${this.items.length} ${noun} · ${order}` +
+      (fresh ? ` · ${fresh} uutta (${NEW_DAYS} pv)` : "");
 
     if (this.items.length === 0) {
       const empty = document.createElement("div");
@@ -349,6 +352,13 @@ export class ListComponent {
     ]
       .filter(Boolean)
       .join(" · ");
+    if (isNew(e)) {
+      const pill = document.createElement("span");
+      pill.className = "list-new";
+      pill.textContent = "UUSI";
+      pill.title = `Annettu ${formatDate(e.dateAnnounced)} – alle ${NEW_DAYS} päivää sitten`;
+      sub.prepend(pill);
+    }
     main.append(title, sub);
 
     const link = document.createElement("a");
@@ -390,6 +400,16 @@ export class ListComponent {
     group.appendChild(seg);
     this.toolbar.appendChild(group);
   }
+}
+
+/** Window for the "UUSI" marker, counted from the viewer's today. */
+const NEW_DAYS = 45;
+
+/** Announced within the last NEW_DAYS days (future-dated acts do not count). */
+function isNew(e: RegulationEvent): boolean {
+  if (!e.dateAnnounced) return false;
+  const age = (Date.now() - dateOf(e.dateAnnounced).getTime()) / 86_400_000;
+  return age >= 0 && age <= NEW_DAYS;
 }
 
 /**
